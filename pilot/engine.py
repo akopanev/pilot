@@ -379,6 +379,7 @@ class PipelineEngine:
         """
         feedback = None
         original_diff = self.runtime.diff_command
+        original_round = self.runtime.round
 
         try:
             for round_num in range(1, step.max_rounds + 1):
@@ -435,6 +436,7 @@ class PipelineEngine:
             )
         finally:
             self.runtime.diff_command = original_diff
+            self.runtime.round = original_round
 
     def handle_signals(self, signals: list, step_id: str) -> None:
         """Process universal signals (called from run_step for every result)."""
