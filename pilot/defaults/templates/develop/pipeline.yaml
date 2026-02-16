@@ -1,0 +1,64 @@
+version: "1.0"
+
+# Develop — full development cycle
+# Analyzes codebase, generates PRD from input, plans tasks,
+# then implements with review/fix loop.
+#
+# Usage:
+#   1. Write your description in .pilot/input.md
+#   2. Run: pilot run
+
+# File conventions — override to customize paths
+inputs:
+  input_file: input.md
+  artifacts_dir: artifacts
+  prd_file: prd.md
+  tasks_dir: tasks
+
+defaults:
+  agent:
+    tool: claude-code
+    model: opus
+    retry: 1
+  iteration_delay_ms: 2000
+
+pipeline:
+  # Phase 1: Analyze codebase — produce artifacts
+  - id: analyze
+    agent:
+      prompt: prompts/analyze.md
+
+  # Phase 2: Generate PRD from input + artifacts
+  - id: prd
+    agent:
+      prompt: prompts/prd.md
+
+  # Phase 3: Break PRD into implementable tasks
+  - id: plan
+    agent:
+      prompt: prompts/plan.md
+
+  # Phase 4: Implement each task, then review/fix until approved
+  - id: dev
+    loop:
+      over: "{{tasks_dir}}/"
+      as: TASK
+    steps:
+      - id: implement
+        agent:
+          prompt: prompts/implement.md
+
+      # Claude review + fix loop (multi-agent, convergence)
+      - id: review-fix
+        loop:
+          until: APPROVE
+          max_rounds: 3
+        steps:
+          - id: review
+            agent:
+              tool: codex
+              model: gpt-5.3-codex
+              prompt: prompts/review.md
+          - id: fix
+            agent:
+              prompt: prompts/fix.md

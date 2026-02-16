@@ -1,0 +1,146 @@
+# pilot.yaml — PILOT v2 Pipeline Configuration
+# ═══════════════════════════════════════════════════════════════
+#
+# Step types (as keys):
+#   agent:  — LLM call   { tool, model, prompt }
+#   shell:  — command     { command }
+#   loop:   — iteration   { over, as, until, max_rounds }
+#   gate:   — user pause  {}
+#
+# Template variables:
+#
+#   User-defined (from inputs):
+#     {{input}}           — .pilot/input.md value
+#     {{plan}}            — .pilot/plan.md value
+#     {{prd}}             — .pilot/prd.md value
+#     {{file:path}}       — injects any file contents inline
+#
+#   Auto-detected (CLI computes at runtime):
+#     {{default_branch}}  — git default branch (main, master, etc.)
+#     {{diff}}            — git diff command (iteration-aware)
+#     {{progress_file_path}} — session progress log path
+#     {{round}}           — current iteration number in loop
+#
+#   Loop-injected (provided by parent loop):
+#     {{TASK}}            — from loop.as (current item contents)
+#     {{FEEDBACK}}        — REJECT payload from previous round
+#
+# Signals (XML, emitted by model in output):
+#   <pilot:approve/>                           — exit convergence loop
+#   <pilot:reject>findings</pilot:reject>      — continue loop with findings
+#   <pilot:blocked>reason</pilot:blocked>      — halt pipeline
+#   <pilot:question>json</pilot:question>      — pause for user input
+#   <pilot:update path="p">content</pilot:update>  — CLI writes state file
+#   <pilot:draft label="l">content</pilot:draft>   — CLI presents for review
+
+version: "1.0"
+
+inputs:
+  input:         .pilot/input.md
+  artifacts_dir: .pilot/artifacts
+  plan:          .pilot/plan.md
+  prd:           .pilot/prd.md
+
+defaults:
+  agent:
+    tool: claude-code
+    model: claude-sonnet-4
+
+# ─────────────────────────────────────────────
+# Pipeline
+# ─────────────────────────────────────────────
+
+pipeline:
+
+  # ── Understand ─────────────────────────────
+
+  - id: snapshot
+    agent:
+      prompt: prompts/snapshot.md
+
+  # ── Define ─────────────────────────────────
+
+  - id: prd
+    agent:
+      prompt: prompts/prd.md
+
+  - id: prd-review
+    agent:
+      tool: opencode
+      model: gemini-2.5-pro
+      prompt: |
+        Review the PRD at {{file:.pilot/prd.md}}.
+        Check against {{file:.pilot/artifacts/PROJECT.md}}.
+        Focus on gaps, contradictions, missing requirements.
+
+  - id: prd-approval
+    gate: {}
+
+  # ── Plan ───────────────────────────────────
+
+  - id: plan
+    agent:
+      prompt: prompts/plan.md
+
+  - id: plan-review
+    agent:
+      tool: codex
+      prompt: |
+        Review {{file:.pilot/plan.md}} against {{file:.pilot/prd.md}}.
+        {{file:agents/architecture.md}}
+
+  - id: plan-approval
+    gate: {}
+
+  # ── Validate ───────────────────────────────
+
+  - id: validate-plan
+    shell:
+      command: python scripts/validate_plan.py {{plan}}
+
+  # ── Build ──────────────────────────────────
+
+  - id: dev
+    loop:
+      over: .pilot/tasks/
+      as: TASK
+      order: asc
+    steps:
+      - id: execute
+        agent:
+          prompt: prompts/execute.md
+
+      - id: code-review
+        loop:
+          until: APPROVE
+          max_rounds: 3
+        steps:
+          - id: review
+            agent:
+              prompt: prompts/review.md
+          - id: fix
+            agent:
+              prompt: prompts/fix.md
+
+      - id: external-qa
+        loop:
+          until: APPROVE
+          max_rounds: 3
+        steps:
+          - id: ext-review
+            agent:
+              tool: codex
+              prompt: prompts/external-review.md
+          - id: ext-fix
+            agent:
+              prompt: prompts/fix.md
+
+      - id: post-checks
+        shell:
+          command: python scripts/post_task_checks.py
+
+  # ── Finalize ───────────────────────────────
+
+  - id: finalize
+    agent:
+      prompt: prompts/finalize.md

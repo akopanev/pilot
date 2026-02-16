@@ -1,0 +1,17 @@
+services:
+  pilot:
+    build:
+      context: .
+      args:
+        USER_UID: "${UID:-1000}"
+    volumes:
+      - ${HOME}/.claude:/mnt/claude:ro
+      - ${HOME}/.codex:/mnt/codex:ro
+      - ${HOME}/.gitconfig:/home/pilot/.gitconfig:ro
+      - .:/workspace
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    working_dir: /workspace
+    tty: true
+    stdin_open: true
