@@ -284,12 +284,14 @@ def cmd_init(args) -> None:
             shutil.copy2(src, dst)
             copied.append(f".pilot/{name}")
 
-    # Create .pilot/session/tasks/ directory
+    # Create .pilot/session/tasks/ and .pilot/session/artifacts/ directories
     session_dir = pilot_dir / "session"
     tasks_dir = session_dir / "tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True)
     if not list(tasks_dir.iterdir()):
         copied.append(".pilot/session/tasks/")
+    artifacts_dir = session_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
 
     if copied:
         print(f"Initialized from template '{template_name}':")

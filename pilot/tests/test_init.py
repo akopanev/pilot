@@ -41,26 +41,23 @@ def test_init_copies_files(monkeypatch):
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "analyze.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "implement.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "claude-implement.md"))
-        assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "review.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "codex-review.md"))
-        assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "claude-review.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "fix.md"))
 
         # Built-in agents are copied into .pilot/agents/
         agents_dir = os.path.join(tmpdir, ".pilot", "agents")
         assert os.path.isdir(agents_dir)
         agent_files = os.listdir(agents_dir)
-        assert len(agent_files) == 10
-        for name in ["implementation.md", "quality.md", "testing.md",
-                      "simplification.md", "documentation.md",
-                      "analyst-pm.md", "analyst-architect.md",
-                      "analyst-ux.md", "analyst-qa.md", "analyst-devops.md"]:
+        assert len(agent_files) == 7
+        for name in ["analyst-architecture.md", "analyst-product.md", "analyst-quality.md",
+                      "analyst-ux.md", "review-spec.md", "review-quality.md", "review-testing.md"]:
             assert name in agent_files
 
-        # README, protocol, and tasks
+        # README, protocol, session dirs
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "README.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "protocol.md"))
         assert os.path.isdir(os.path.join(tmpdir, ".pilot", "session", "tasks"))
+        assert os.path.isdir(os.path.join(tmpdir, ".pilot", "session", "artifacts"))
 
 
 def test_init_creates_pilot_dir(monkeypatch):
@@ -72,6 +69,7 @@ def test_init_creates_pilot_dir(monkeypatch):
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "README.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "protocol.md"))
         assert os.path.isdir(os.path.join(tmpdir, ".pilot", "session", "tasks"))
+        assert os.path.isdir(os.path.join(tmpdir, ".pilot", "session", "artifacts"))
 
 
 def test_init_readme_has_content(monkeypatch):

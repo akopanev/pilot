@@ -75,8 +75,8 @@ def test_agents_with_yaml_agents(monkeypatch, capsys):
         cmd_agents(FakeArgs(config=config_path))
 
         out = capsys.readouterr().out
-        # 1 YAML agent + 10 built-in agents = 11
-        assert "Agents (11 loaded):" in out
+        # 1 YAML agent + 7 built-in agents = 8
+        assert "Agents (8 loaded):" in out
         assert "reviewer" in out
         assert "codex" in out
         assert "gpt-4o" in out
@@ -90,8 +90,8 @@ def test_agents_no_agents(monkeypatch, capsys):
         cmd_agents(FakeArgs(config=config_path))
 
         out = capsys.readouterr().out
-        # Even with no YAML or file agents, 10 built-in agents are loaded
-        assert "Agents (10 loaded):" in out
+        # Even with no YAML or file agents, 7 built-in agents are loaded
+        assert "Agents (7 loaded):" in out
         assert "built-in" in out
 
 
@@ -100,19 +100,19 @@ def test_agents_with_file_agents(monkeypatch, capsys):
         monkeypatch.chdir(tmpdir)
         config_path = _write_config(tmpdir)
 
-        # Create a .pilot/agents/ file-based agent (overrides built-in quality)
+        # Create a .pilot/agents/ file-based agent (overrides built-in review-quality)
         agents_dir = os.path.join(tmpdir, ".pilot", "agents")
         os.makedirs(agents_dir)
-        with open(os.path.join(agents_dir, "quality.md"), "w") as f:
+        with open(os.path.join(agents_dir, "review-quality.md"), "w") as f:
             f.write("---\ntool: claude-code\nmodel: claude-sonnet-4\n---\nCheck quality.\n")
 
         cmd_agents(FakeArgs(config=config_path))
 
         out = capsys.readouterr().out
-        # File-based quality overrides built-in quality, so still 10 total
-        assert "Agents (10 loaded):" in out
-        assert "quality" in out
-        assert ".pilot/agents/quality.md" in out
+        # File-based review-quality overrides built-in review-quality, so still 7 total
+        assert "Agents (7 loaded):" in out
+        assert "review-quality" in out
+        assert ".pilot/agents/review-quality.md" in out
 
 
 # --- pilot doctor ---

@@ -8,6 +8,8 @@ version: "1.0"
 
 inputs:
   tasks_dir: session/tasks
+  artifacts_dir: session/artifacts
+  # docs_dir: docs  # uncomment and set path to project documentation folder
 
 defaults:
   agent:
@@ -17,7 +19,7 @@ defaults:
   iteration_delay_ms: 2000
 
 pipeline:
-  # Phase 1: Analyze codebase — produce snapshot
+  # Phase 1: Analyze codebase — produce artifacts
   - id: analyze
     agent:
       prompt: prompts/analyze.md

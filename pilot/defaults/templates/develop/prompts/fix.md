@@ -9,6 +9,14 @@ Fix the issues identified in the code review.
 ## Review Feedback
 {{FEEDBACK}}
 
+## Codebase Context
+
+Read the analysis artifacts for context:
+- `.pilot/{{artifacts_dir}}/ARCHITECTURE.md` — structure, patterns, conventions
+- `.pilot/{{artifacts_dir}}/QA.md` — test/build commands
+
+If `.pilot/{{docs_dir}}/` exists, read the project documentation there for additional context.
+
 ## Instructions
 
 1. Read each issue in the feedback carefully — note the file, line, and suggested fix
@@ -18,9 +26,9 @@ Fix the issues identified in the code review.
    - Apply the fix or an equivalent correction
    - Verify the fix doesn't break surrounding code
 3. After all issues are fixed:
-   - Run the project's test suite — ALL tests must pass
-   - Run the linter if configured — ALL issues must be resolved
-   - Fix any failures caused by your changes
+   - Run the test suite: {{emit.test_command}}
+   - Run the build if available: {{emit.build_command}}
+   - ALL must pass. Fix any failures caused by your changes.
 4. Amend the implementation commit: `git commit --amend --no-edit`
 
 ## Rules
