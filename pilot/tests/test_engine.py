@@ -799,3 +799,147 @@ def test_multiple_questions_incremental_numbering(mock_input):
         qa_dir = os.path.join(tmpdir, "session", "qa")
         files = sorted(os.listdir(qa_dir))
         assert files == ["prd-001.json", "prd-002.json"]
+
+
+# ── Feedback accumulation ─────────────────────────────
+
+def test_feedback_accumulates_across_rounds():
+    """Reject feedback from all rounds should be visible, not just the latest."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        review_prompt = os.path.join(tmpdir, "review.md")
+        fix_prompt = os.path.join(tmpdir, "fix.md")
+        with open(review_prompt, "w") as f:
+            f.write("review {{FEEDBACK}}")
+        with open(fix_prompt, "w") as f:
+            f.write("fix {{FEEDBACK}}")
+
+        loop_step = LoopStep(
+            id="review-fix",
+            steps=[
+                AgentStep(id="review", prompt="review.md"),
+                AgentStep(id="fix", prompt="fix.md"),
+            ],
+            until="APPROVE",
+            max_rounds=3,
+        )
+        engine = _make_engine([loop_step], tmpdir)
+        engine.config.iteration_delay_ms = 0
+
+        call_count = 0
+        seen_review_prompts = []
+        seen_fix_prompts = []
+
+        def mock_run(prompt, model, args=None):
+            nonlocal call_count
+            call_count += 1
+            # Round 1: review rejects "missing tests"
+            # Round 1: fix runs (gets feedback)
+            # Round 2: review rejects "error handling"
+            # Round 2: fix runs (gets accumulated feedback) then approves
+            if "review" in prompt and "missing tests" not in prompt:
+                # Round 1 review
+                seen_review_prompts.append(prompt)
+                return ExecutorResult(
+                    output="out", exit_code=0, error=None,
+                    signals=[Signal(type="reject", payload="missing tests")],
+                )
+            elif "review" in prompt and "missing tests" in prompt:
+                # Round 2 review — can see round 1 feedback
+                seen_review_prompts.append(prompt)
+                return ExecutorResult(
+                    output="out", exit_code=0, error=None,
+                    signals=[Signal(type="reject", payload="error handling")],
+                )
+            else:
+                # Fix step
+                seen_fix_prompts.append(prompt)
+                if len(seen_fix_prompts) >= 2:
+                    return ExecutorResult(
+                        output="out", exit_code=0, error=None,
+                        signals=[Signal(type="approve")],
+                    )
+                return ExecutorResult(
+                    output="out", exit_code=0, error=None, signals=[],
+                )
+
+        executor = engine.executors.get("claude-code")
+        executor.run = mock_run
+
+        heads = iter(["a", "b", "c", "d", "e", "f"])
+        with patch("pilot.engine.get_head_hash", side_effect=heads):
+            engine._run_convergence_loop(loop_step, {})
+
+        # Round 2 fix should see BOTH rounds' feedback
+        assert len(seen_fix_prompts) >= 2
+        last_fix = seen_fix_prompts[-1]
+        assert "missing tests" in last_fix
+        assert "error handling" in last_fix
+        assert "Round 1" in last_fix
+        assert "Round 2" in last_fix
+
+
+def test_feedback_persisted_to_disk():
+    """Each rejection should be written to .pilot/session/reviews/."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        prompt_file = os.path.join(tmpdir, "review.md")
+        with open(prompt_file, "w") as f:
+            f.write("review")
+
+        loop_step = LoopStep(
+            id="review-fix",
+            steps=[AgentStep(id="review", prompt="review.md")],
+            until="APPROVE",
+            max_rounds=3,
+        )
+        engine = _make_engine([loop_step], tmpdir)
+        engine.config.iteration_delay_ms = 0
+
+        call_count = 0
+
+        def mock_execute(step, loop_vars):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return ExecutorResult(
+                    output="out", exit_code=0, error=None,
+                    signals=[Signal(type="reject", payload="needs work")],
+                )
+            return ExecutorResult(
+                output="out", exit_code=0, error=None,
+                signals=[Signal(type="approve")],
+            )
+
+        engine._execute_agent = mock_execute
+
+        heads = iter(["a", "b", "c", "d"])
+        with patch("pilot.engine.get_head_hash", side_effect=heads):
+            engine._run_convergence_loop(loop_step, {})
+
+        reviews_dir = os.path.join(tmpdir, "session", "reviews")
+        assert os.path.isdir(reviews_dir)
+        files = os.listdir(reviews_dir)
+        assert len(files) == 1
+        assert "review-fix-round-01.md" in files
+
+        with open(os.path.join(reviews_dir, files[0])) as f:
+            content = f.read()
+        assert "needs work" in content
+
+
+def test_format_feedback_single_round():
+    """Single rejection should be returned as-is, no headers."""
+    result = PipelineEngine._format_feedback([(1, "missing tests")])
+    assert result == "missing tests"
+    assert "Round" not in result
+
+
+def test_format_feedback_multiple_rounds():
+    """Multiple rejections should be formatted with round headers."""
+    result = PipelineEngine._format_feedback([
+        (1, "missing tests"),
+        (2, "error handling"),
+    ])
+    assert "### Round 1" in result
+    assert "missing tests" in result
+    assert "### Round 2" in result
+    assert "error handling" in result

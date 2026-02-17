@@ -113,12 +113,10 @@ def create_branch(branch_name: str) -> tuple[bool, str]:
     return result.returncode == 0, error
 
 
-def get_diff_command(default_branch: str, is_first: bool) -> str:
-    """Return iteration-aware git diff command.
+def get_diff_command(default_branch: str, **_kwargs) -> str:
+    """Return git diff command showing all branch changes.
 
-    First iteration: diff all changes in branch.
-    Subsequent: diff only uncommitted changes.
+    Always diffs against the default branch so the reviewer sees the
+    complete picture — implement commits and fix amends both land on HEAD.
     """
-    if is_first:
-        return f"git diff {default_branch}...HEAD"
-    return "git diff"
+    return f"git diff {default_branch}...HEAD"

@@ -3,18 +3,25 @@ Analyze the current codebase and produce a structured snapshot for use by all su
 ## Protocol
 {{file:protocol.md}}
 
+## Rules
+
+- **Read-only** — do NOT modify, create, or delete any files. Do NOT run git checkout, git restore, git clean, or any command that changes the working tree. You are here to observe, not to fix.
+- **Ignore `.pilot/`** — the `.pilot/` directory is pipeline configuration, not project code. Do not read, analyze, or reference anything in it.
+- **Working tree is truth** — analyze only files that exist on disk right now. If files are deleted in the working tree but tracked in git, they are deleted. Do not recover them, do not read them from git history.
+- Do NOT use the Task tool or launch sub-agents — do the analysis yourself directly.
+
 ## Instructions
 
-This snapshot runs ONCE at pipeline start. Every stage after this (PRD, planning, implementation, review) will reference your output. Be thorough and precise — downstream quality depends on this.
+This snapshot runs ONCE at pipeline start. Every stage after this (implementation, review) will reference your output. Be thorough and precise — downstream quality depends on this.
 
-## Step 1: Quick Scan
+### Quick Scan
 
-Before launching analysts, do a rapid 2-minute scan:
+Start with a rapid scan:
 - Read the project root: README, package manifest (package.json, setup.py, Cargo.toml, go.mod, etc.), and top-level directory structure
 - Determine: **product type** (CLI, web app, API, library, mobile, desktop)
 - Determine: **project stage** (greenfield — empty/minimal, or brownfield — existing code)
 
-If the project is greenfield (no meaningful code yet), skip the full analysis. Emit a minimal snapshot and complete immediately:
+If the project is greenfield (no meaningful source code on disk), emit a minimal snapshot and complete immediately:
 
 <pilot:emit key="snapshot">
 # Codebase Snapshot
@@ -40,34 +47,22 @@ If the project is greenfield (no meaningful code yet), skip the full analysis. E
 
 <pilot:completed>greenfield project — minimal snapshot</pilot:completed>
 
-## Step 2: Launch ALL 5 Analyst Agents IN PARALLEL
+### Full Analysis (brownfield)
 
-Launch all agents using the Task tool with run_in_background=true — ALL 5 in one response.
-Then immediately call TaskOutput(task_id, block=true) for EACH agent to wait for its completion.
-Collect ALL results before proceeding to Step 3.
+For existing projects, scan the codebase directly. Cover each area below:
 
-CRITICAL: Do NOT proceed to Step 3 until ALL 5 agents have returned results. Wait for every TaskOutput call to complete. Do not start synthesizing based on partial results.
+1. **Project identity** — purpose, target user, product type
+2. **Architecture** — language, framework, module structure, entry points, key modules, data flow
+3. **Tech stack** — build system, dependencies, infrastructure, deployment
+4. **Patterns & conventions** — code organization, naming, error handling, config management
+5. **Quality** — test framework, test status (run the tests), coverage, linting, CI/CD
+6. **Health** — documentation quality, TODOs/FIXMEs count, known gaps
 
-{{agent:analyst-pm}}
-{{agent:analyst-architect}}
-{{agent:analyst-ux}}
-{{agent:analyst-qa}}
-{{agent:analyst-devops}}
+Keep the scan focused — read only what you need to fill in the snapshot. Do not read every file. Prioritize: README, package manifests, entry points, config files, test runner output, and a representative sample of source files.
 
-## Step 3: Collect and Synthesize
+### Emit Snapshot
 
-After ALL agents complete:
-
-1. Collect all 5 reports
-2. Write each report as an individual artifact file:
-
-<pilot:update path=".pilot/{{artifacts_dir}}/PROJECT.md">[PM analyst report]</pilot:update>
-<pilot:update path=".pilot/{{artifacts_dir}}/ARCHITECTURE.md">[Architect analyst report]</pilot:update>
-<pilot:update path=".pilot/{{artifacts_dir}}/UX.md">[UX analyst report]</pilot:update>
-<pilot:update path=".pilot/{{artifacts_dir}}/QA.md">[QA analyst report]</pilot:update>
-<pilot:update path=".pilot/{{artifacts_dir}}/OPS.md">[DevOps analyst report]</pilot:update>
-
-3. Synthesize all findings into a single unified snapshot:
+Synthesize all findings into a single unified snapshot:
 
 <pilot:emit key="snapshot">
 # Codebase Snapshot
@@ -105,22 +100,16 @@ After ALL agents complete:
 - **Linting/formatting**: [tools in use]
 - **CI/CD**: [what exists]
 
-## User Experience
-- **Interfaces**: [list of user touchpoints]
-- **Primary flow**: [main user journey]
-- **Error experience**: [how errors reach users]
-
 ## Health
 - **Documentation**: [good/adequate/poor]
 - **TODOs/FIXMEs**: [count]
-- **Known gaps**: [list of significant gaps across all dimensions]
+- **Known gaps**: [list of significant gaps]
 </pilot:emit>
 
 ## Important
 
-- The emitted snapshot is consumed by: PRD generation, task planning, implementation, and review
+- The emitted snapshot is consumed by: implementation and review steps
 - Keep the snapshot factual and dense — no filler, no praise, no recommendations
-- Individual artifact files in `.pilot/{{artifacts_dir}}/` are for human reference and for direct reads by downstream stages (PRD, planner)
 
 When complete:
 <pilot:completed>codebase analysis complete</pilot:completed>

@@ -21,7 +21,7 @@ Fix the issues identified in the code review.
    - Run the project's test suite — ALL tests must pass
    - Run the linter if configured — ALL issues must be resolved
    - Fix any failures caused by your changes
-4. Commit all fixes: `git commit -m "fix: address code review findings"`
+4. Amend the implementation commit: `git commit --amend --no-edit`
 
 ## Rules
 

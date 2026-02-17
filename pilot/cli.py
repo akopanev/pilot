@@ -303,10 +303,8 @@ def cmd_init(args) -> None:
         print(f"Template '{template_name}' is empty.")
 
     print(f"\nNext steps:")
-    print(f"  1. Edit .pilot/pipeline.yaml")
-    print(f"  2. Customize .pilot/prompts/ for your workflow")
-    print(f"  3. Add task files to .pilot/session/tasks/")
-    print(f"  4. Run: pilot run --dry-run")
+    print(f"  1. Add task files to .pilot/session/tasks/")
+    print(f"  2. Run: pilot run")
 
 
 def cmd_agents(args) -> None:
@@ -372,7 +370,7 @@ def cmd_doctor(args) -> None:
         checks.append(("Tasks", ".pilot/session/tasks/ not found", False))
 
     # Tool availability
-    for label, binary in [("claude-code", "claude"), ("codex", "codex")]:
+    for label, binary in [("claude-code", "claude")]:
         found = shutil.which(binary) is not None
         checks.append((label, "found" if found else "not found", found))
 

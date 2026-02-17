@@ -38,12 +38,12 @@ def test_init_copies_files(monkeypatch):
 
         # Template files are copied into .pilot/
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "pipeline.yaml"))
-        assert os.path.isfile(os.path.join(tmpdir, ".pilot", "input.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "analyze.md"))
-        assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "prd.md"))
-        assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "plan.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "implement.md"))
+        assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "claude-implement.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "review.md"))
+        assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "codex-review.md"))
+        assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "claude-review.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "prompts", "fix.md"))
 
         # Built-in agents are copied into .pilot/agents/
@@ -138,4 +138,4 @@ def test_init_prints_next_steps(monkeypatch, capsys):
 
         out = capsys.readouterr().out
         assert "Next steps:" in out
-        assert "pilot run --dry-run" in out
+        assert "pilot run" in out

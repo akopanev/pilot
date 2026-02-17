@@ -174,6 +174,18 @@ class PipelineEngine:
             json.dump({"step_id": qa.step_id, "question": qa.question, "answer": qa.answer}, f, indent=2)
             f.write("\n")
 
+    # ── Review feedback persistence ─────────────────────
+
+    def _save_feedback(self, step_id: str, round_num: int, payload: str) -> None:
+        """Persist a rejection to .pilot/session/reviews/{step_id}-round-{N}.md."""
+        reviews_dir = os.path.join(self.runtime.session_dir, "reviews")
+        os.makedirs(reviews_dir, exist_ok=True)
+        filepath = os.path.join(reviews_dir, f"{step_id}-round-{round_num:02d}.md")
+        with open(filepath, "w") as f:
+            f.write(f"# Review feedback — {step_id} round {round_num}\n\n")
+            f.write(payload)
+            f.write("\n")
+
     # ── Step tracking (via session.json) ─────────────────
 
     def _sleep(self, ms: int | None = None) -> None:
@@ -377,7 +389,7 @@ class PipelineEngine:
         Can be nested inside an iterator loop — parent_vars carries
         the outer loop's variables (e.g., {{TASK}}) into this loop.
         """
-        feedback = None
+        feedback_history: list[tuple[int, str]] = []
         original_diff = self.runtime.diff_command
         original_round = self.runtime.round
 
@@ -393,8 +405,8 @@ class PipelineEngine:
                 )
 
                 loop_vars = {**(parent_vars or {})}
-                if feedback:
-                    loop_vars["FEEDBACK"] = feedback
+                if feedback_history:
+                    loop_vars["FEEDBACK"] = self._format_feedback(feedback_history)
 
                 self.progress.log(f"  round {round_num}/{step.max_rounds}")
 
@@ -417,11 +429,13 @@ class PipelineEngine:
                         self.progress.log(f"  ✓ approved at round {round_num}")
                         return
 
-                    # REJECT → carry feedback to next round
+                    # REJECT → accumulate feedback, persist to disk
                     rejects = [s for s in result.signals if s.type == "reject"]
                     if rejects:
-                        feedback = rejects[-1].payload
-                        loop_vars["FEEDBACK"] = feedback or ""
+                        payload = rejects[-1].payload or ""
+                        feedback_history.append((round_num, payload))
+                        loop_vars["FEEDBACK"] = self._format_feedback(feedback_history)
+                        self._save_feedback(step.id, round_num, payload)
                         saw_reject = True
 
                 head_after = get_head_hash()
@@ -437,6 +451,16 @@ class PipelineEngine:
         finally:
             self.runtime.diff_command = original_diff
             self.runtime.round = original_round
+
+    @staticmethod
+    def _format_feedback(history: list[tuple[int, str]]) -> str:
+        """Format accumulated feedback from all rounds."""
+        if len(history) == 1:
+            return history[0][1]
+        parts = []
+        for round_num, text in history:
+            parts.append(f"### Round {round_num}\n{text}")
+        return "\n\n".join(parts)
 
     def handle_signals(self, signals: list, step_id: str) -> None:
         """Process universal signals (called from run_step for every result)."""
