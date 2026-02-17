@@ -31,10 +31,13 @@ def _make_engine(steps, tmpdir, cancel_event=None, defaults=None):
         defaults=defaults or AgentDefaults(),
         pipeline=steps,
     )
-    progress_path = os.path.join(tmpdir, "progress.log")
+    session_dir = os.path.join(tmpdir, "session")
+    os.makedirs(session_dir, exist_ok=True)
+    progress_path = os.path.join(session_dir, "progress.log")
     runtime = RuntimeContext(
         project_dir=tmpdir,
         config_dir=tmpdir,
+        session_dir=session_dir,
         default_branch="main",
         progress_path=progress_path,
         diff_command="git diff main...HEAD",
@@ -755,7 +758,7 @@ def test_question_persists_to_disk(mock_input):
         engine.handle_signals(signals, "plan")
 
         # Check file was written
-        qa_dir = os.path.join(tmpdir, "qa")
+        qa_dir = os.path.join(tmpdir, "session", "qa")
         assert os.path.isdir(qa_dir)
         files = os.listdir(qa_dir)
         assert len(files) == 1
@@ -771,7 +774,7 @@ def test_question_persists_to_disk(mock_input):
 def test_qa_loaded_on_engine_init():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Pre-populate qa/ directory
-        qa_dir = os.path.join(tmpdir, "qa")
+        qa_dir = os.path.join(tmpdir, "session", "qa")
         os.makedirs(qa_dir)
         with open(os.path.join(qa_dir, "prd-001.json"), "w") as f:
             json.dump({"step_id": "prd", "question": "DB?", "answer": "Postgres"}, f)
@@ -793,6 +796,6 @@ def test_multiple_questions_incremental_numbering(mock_input):
         engine.handle_signals([Signal(type="question", payload="Q1?")], "prd")
         engine.handle_signals([Signal(type="question", payload="Q2?")], "prd")
 
-        qa_dir = os.path.join(tmpdir, "qa")
+        qa_dir = os.path.join(tmpdir, "session", "qa")
         files = sorted(os.listdir(qa_dir))
         assert files == ["prd-001.json", "prd-002.json"]

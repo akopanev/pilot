@@ -122,9 +122,9 @@ def test_doctor_with_config(monkeypatch, capsys):
         monkeypatch.chdir(tmpdir)
         config_path = _write_config(tmpdir)
 
-        # Create .pilot/tasks/
-        tasks_dir = os.path.join(tmpdir, ".pilot", "tasks")
-        os.makedirs(tasks_dir)
+        # Create .pilot/session/tasks/
+        tasks_dir = os.path.join(tmpdir, ".pilot", "session", "tasks")
+        os.makedirs(tasks_dir, exist_ok=True)
         with open(os.path.join(tasks_dir, "task1.md"), "w") as f:
             f.write("task 1")
 

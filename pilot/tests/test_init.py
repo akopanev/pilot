@@ -24,10 +24,11 @@ def test_templates_dir_has_templates():
     assert "develop" in templates
 
 
-def test_repo_root_has_readme():
-    """README.md at repo root is the single source of truth for .pilot/README.md."""
-    repo_root = Path(__file__).parent.parent.parent
-    assert (repo_root / "README.md").is_file()
+def test_defaults_has_bundled_files():
+    """README.md and protocol.md must be in defaults/ for pip install to work."""
+    d = get_defaults_dir()
+    assert (d / "README.md").is_file()
+    assert (d / "protocol.md").is_file()
 
 
 def test_init_copies_files(monkeypatch):
@@ -59,7 +60,7 @@ def test_init_copies_files(monkeypatch):
         # README, protocol, and tasks
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "README.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "protocol.md"))
-        assert os.path.isdir(os.path.join(tmpdir, ".pilot", "tasks"))
+        assert os.path.isdir(os.path.join(tmpdir, ".pilot", "session", "tasks"))
 
 
 def test_init_creates_pilot_dir(monkeypatch):
@@ -70,7 +71,7 @@ def test_init_creates_pilot_dir(monkeypatch):
         assert os.path.isdir(os.path.join(tmpdir, ".pilot"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "README.md"))
         assert os.path.isfile(os.path.join(tmpdir, ".pilot", "protocol.md"))
-        assert os.path.isdir(os.path.join(tmpdir, ".pilot", "tasks"))
+        assert os.path.isdir(os.path.join(tmpdir, ".pilot", "session", "tasks"))
 
 
 def test_init_readme_has_content(monkeypatch):

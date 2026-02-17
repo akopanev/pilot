@@ -34,6 +34,7 @@ def test_expand_runtime():
     runtime = RuntimeContext(
         project_dir="/tmp",
         config_dir="/tmp",
+        session_dir="/tmp/session",
         default_branch="main",
         progress_path=".pilot/progress.log",
         diff_command="git diff main...HEAD",
@@ -86,6 +87,7 @@ def test_expand_prompt_full():
         runtime = RuntimeContext(
             project_dir=tmpdir,
             config_dir=tmpdir,
+            session_dir=os.path.join(tmpdir, "session"),
             default_branch="main",
             progress_path=".pilot/progress.log",
             diff_command="git diff main...HEAD",
@@ -161,6 +163,7 @@ def test_expand_prompt_with_emissions():
         runtime = RuntimeContext(
             project_dir=tmpdir,
             config_dir=tmpdir,
+            session_dir=os.path.join(tmpdir, "session"),
             default_branch="main",
             progress_path=".pilot/progress.log",
             diff_command="git diff main...HEAD",
@@ -254,6 +257,7 @@ def test_expand_prompt_with_agents():
         runtime = RuntimeContext(
             project_dir=tmpdir,
             config_dir=tmpdir,
+            session_dir=os.path.join(tmpdir, "session"),
             default_branch="main",
             progress_path=".pilot/progress.log",
             diff_command="git diff main...HEAD",
@@ -332,6 +336,7 @@ def test_expand_prompt_with_questions():
         runtime = RuntimeContext(
             project_dir=tmpdir,
             config_dir=tmpdir,
+            session_dir=os.path.join(tmpdir, "session"),
             default_branch="main",
             progress_path=".pilot/progress.log",
             diff_command="git diff main...HEAD",

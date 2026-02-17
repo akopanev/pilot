@@ -89,6 +89,7 @@ class QAPair:
 class RuntimeContext:
     project_dir: str              # workspace root (cwd)
     config_dir: str               # directory containing pipeline.yaml (for path resolution)
+    session_dir: str              # .pilot/session/ — all per-run state (gitignored)
     default_branch: str
     progress_path: str
     diff_command: str

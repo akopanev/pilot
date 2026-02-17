@@ -24,10 +24,13 @@ def _make_engine(steps, tmpdir, emissions=None):
         defaults=AgentDefaults(),
         pipeline=steps,
     )
-    progress_path = os.path.join(tmpdir, "progress.log")
+    session_dir = os.path.join(tmpdir, "session")
+    os.makedirs(session_dir, exist_ok=True)
+    progress_path = os.path.join(session_dir, "progress.log")
     runtime = RuntimeContext(
         project_dir=tmpdir,
         config_dir=tmpdir,
+        session_dir=session_dir,
         default_branch="main",
         progress_path=progress_path,
         diff_command="git diff main...HEAD",
@@ -132,7 +135,7 @@ def test_save_emission_creates_file():
         engine = _make_engine([], tmpdir)
         engine._save_emission("snapshot", "# Project Snapshot\nDetails here.")
 
-        emission_path = os.path.join(tmpdir, "emissions", "snapshot.md")
+        emission_path = os.path.join(tmpdir, "session", "emissions", "snapshot.md")
         assert os.path.isfile(emission_path)
         with open(emission_path) as f:
             assert f.read() == "# Project Snapshot\nDetails here."
@@ -140,8 +143,8 @@ def test_save_emission_creates_file():
 
 def test_load_emissions_on_startup():
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Pre-create emissions directory with files
-        emissions_dir = os.path.join(tmpdir, "emissions")
+        # Pre-create emissions directory with files (inside session/)
+        emissions_dir = os.path.join(tmpdir, "session", "emissions")
         os.makedirs(emissions_dir)
         with open(os.path.join(emissions_dir, "snapshot.md"), "w") as f:
             f.write("cached snapshot")
@@ -156,7 +159,7 @@ def test_load_emissions_on_startup():
 
 def test_load_emissions_ignores_non_md_files():
     with tempfile.TemporaryDirectory() as tmpdir:
-        emissions_dir = os.path.join(tmpdir, "emissions")
+        emissions_dir = os.path.join(tmpdir, "session", "emissions")
         os.makedirs(emissions_dir)
         with open(os.path.join(emissions_dir, "snapshot.md"), "w") as f:
             f.write("good")
@@ -185,7 +188,7 @@ def test_emit_signal_persists_to_disk():
         # In memory
         assert engine.runtime.emissions["api_url"] == "https://api.com"
         # On disk
-        emission_path = os.path.join(tmpdir, "emissions", "api_url.md")
+        emission_path = os.path.join(tmpdir, "session", "emissions", "api_url.md")
         assert os.path.isfile(emission_path)
         with open(emission_path) as f:
             assert f.read() == "https://api.com"
@@ -233,8 +236,8 @@ def test_run_marks_steps_done_in_session():
         assert engine.session.is_done("step1")
         assert engine.session.is_done("step2")
 
-        # Verify session.json on disk
-        with open(os.path.join(tmpdir, "session.json")) as f:
+        # Verify session.json on disk (inside session/)
+        with open(os.path.join(tmpdir, "session", "session.json")) as f:
             data = json.load(f)
         assert data["completed"] == ["step1", "step2"]
         assert data["current"] is None

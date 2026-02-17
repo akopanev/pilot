@@ -5,7 +5,7 @@ version: "1.0"
 # then implements with review/fix loop.
 #
 # Usage:
-#   1. Write your description in .pilot/input.md
+#   1. Add task files to .pilot/session/tasks/
 #   2. Run: pilot run
 
 # File conventions — override to customize paths
@@ -13,7 +13,7 @@ inputs:
   input_file: input.md
   artifacts_dir: artifacts
   prd_file: prd.md
-  tasks_dir: tasks
+  tasks_dir: session/tasks
 
 defaults:
   agent:

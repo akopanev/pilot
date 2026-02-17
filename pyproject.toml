@@ -24,6 +24,7 @@ pilot = [
     "defaults/agents/*.md",
     "defaults/templates/**/*",
     "defaults/README.md",
+    "defaults/protocol.md",
 ]
 
 [project.scripts]

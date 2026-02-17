@@ -102,13 +102,16 @@ def cmd_run(args) -> None:
     config = load_config(args.config)
     default_branch = get_default_branch()
 
-    progress_path = os.path.join(".pilot", f"progress-{int(time.time())}.log")
-
     config_dir = os.path.dirname(os.path.abspath(args.config))
+    session_dir = os.path.join(config_dir, "session")
+    os.makedirs(session_dir, exist_ok=True)
+
+    progress_path = os.path.join(session_dir, f"progress-{int(time.time())}.log")
 
     runtime = RuntimeContext(
         project_dir=os.getcwd(),
         config_dir=config_dir,
+        session_dir=session_dir,
         default_branch=default_branch,
         progress_path=progress_path,
         diff_command=get_diff_command(default_branch, is_first=True),
@@ -146,7 +149,7 @@ def cmd_run(args) -> None:
         return
 
     # Session + branch
-    session = Session(config_dir)
+    session = Session(session_dir)
     branch = _resolve_branch(args, config)
     if branch and is_on_default_branch():
         ok, err = create_branch(branch)
@@ -268,31 +271,25 @@ def cmd_init(args) -> None:
         shutil.copy2(src_file, dst)
         copied.append(f".pilot/agents/{src_file.name}")
 
-    # Copy bundled defaults into .pilot/
-    # README.md comes from the repo root (single source of truth)
-    repo_root = Path(__file__).parent.parent
-    readme_src = repo_root / "README.md"
-    readme_dst = pilot_dir / "README.md"
-    if readme_src.is_file() and not readme_dst.exists():
-        shutil.copy2(readme_src, readme_dst)
-        copied.append(".pilot/README.md")
-    elif readme_dst.exists():
-        skipped.append(".pilot/README.md")
+    # Copy bundled defaults (README.md, protocol.md) into .pilot/
+    defaults_dir = get_defaults_dir()
+    for name in ("README.md", "protocol.md"):
+        src = defaults_dir / name
+        dst = pilot_dir / name
+        if not src.is_file():
+            continue
+        if dst.exists():
+            skipped.append(f".pilot/{name}")
+        else:
+            shutil.copy2(src, dst)
+            copied.append(f".pilot/{name}")
 
-    # protocol.md from defaults/
-    protocol_src = get_defaults_dir() / "protocol.md"
-    protocol_dst = pilot_dir / "protocol.md"
-    if protocol_src.is_file() and not protocol_dst.exists():
-        shutil.copy2(protocol_src, protocol_dst)
-        copied.append(".pilot/protocol.md")
-    elif protocol_dst.exists():
-        skipped.append(".pilot/protocol.md")
-
-    # Create .pilot/tasks/ directory
-    tasks_dir = pilot_dir / "tasks"
+    # Create .pilot/session/tasks/ directory
+    session_dir = pilot_dir / "session"
+    tasks_dir = session_dir / "tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True)
     if not list(tasks_dir.iterdir()):
-        copied.append(".pilot/tasks/")
+        copied.append(".pilot/session/tasks/")
 
     if copied:
         print(f"Initialized from template '{template_name}':")
@@ -308,7 +305,7 @@ def cmd_init(args) -> None:
     print(f"\nNext steps:")
     print(f"  1. Edit .pilot/pipeline.yaml")
     print(f"  2. Customize .pilot/prompts/ for your workflow")
-    print(f"  3. Add task files to .pilot/tasks/")
+    print(f"  3. Add task files to .pilot/session/tasks/")
     print(f"  4. Run: pilot run --dry-run")
 
 
@@ -367,12 +364,12 @@ def cmd_doctor(args) -> None:
         checks.append(("Agents", "no config", False))
 
     # Tasks
-    tasks_dir = os.path.join(".pilot", "tasks")
+    tasks_dir = os.path.join(".pilot", "session", "tasks")
     if os.path.isdir(tasks_dir):
         task_files = [f for f in os.listdir(tasks_dir) if f.endswith(".md")]
-        checks.append(("Tasks", f"{len(task_files)} files in .pilot/tasks/", True))
+        checks.append(("Tasks", f"{len(task_files)} files in .pilot/session/tasks/", True))
     else:
-        checks.append(("Tasks", ".pilot/tasks/ not found", False))
+        checks.append(("Tasks", ".pilot/session/tasks/ not found", False))
 
     # Tool availability
     for label, binary in [("claude-code", "claude"), ("codex", "codex")]:

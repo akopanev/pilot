@@ -55,9 +55,9 @@ class PipelineEngine:
         self.executors = ExecutorPool(error_patterns=config.error_patterns)
         self.progress = ProgressLog(runtime.progress_path)
         self.cancel_event = cancel_event or threading.Event()
-        self.session = Session(runtime.config_dir)
-        self._emissions_dir = os.path.join(runtime.config_dir, "emissions")
-        self._qa_dir = os.path.join(runtime.config_dir, "qa")
+        self.session = Session(runtime.session_dir)
+        self._emissions_dir = os.path.join(runtime.session_dir, "emissions")
+        self._qa_dir = os.path.join(runtime.session_dir, "qa")
         self._load_emissions()
         self._load_qa()
 
