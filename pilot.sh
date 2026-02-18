@@ -163,7 +163,7 @@ JQ_STREAM='
 # ── executor functions ────────────────────────────────────────────────
 
 run_claude() {
-  local prompt="$1" model="$2" tmpfile="$3"
+  local prompt="$1" model="$2" logfile="$3"
   local streamfile
   streamfile=$(mktemp)
 
@@ -174,7 +174,8 @@ run_claude() {
       --model "$model" --verbose \
       --output-format stream-json \
       "$prompt" 2>&1 | tee "$streamfile" | \
-      jq --unbuffered -r "$JQ_STREAM" 2>/dev/null
+      jq --unbuffered -r "$JQ_STREAM" 2>/dev/null | \
+      tee -a "$logfile"
     echo ""
     echo "  ┄┄┄"
   else
@@ -183,16 +184,15 @@ run_claude() {
       --output-format stream-json \
       "$prompt" 2>&1 | tee "$streamfile" | \
       jq --unbuffered -r "$JQ_STREAM" 2>/dev/null | \
+      tee -a "$logfile" | \
       sed -nu 's/.*<loop:update>\(.*\)<\/loop:update>.*/  ▸ \1/p'
   fi
 
-  # extract plain text from NDJSON for signal parsing
-  jq -rj "$JQ_STREAM" < "$streamfile" > "$tmpfile" 2>/dev/null
   rm -f "$streamfile"
 }
 
 run_codex() {
-  local prompt="$1" model="$2" tmpfile="$3"
+  local prompt="$1" model="$2" logfile="$3"
 
   # codex needs prompt as positional arg, not via -p
   # Docker: full access; bare metal: full-auto sandbox
@@ -206,7 +206,7 @@ run_codex() {
       -c model="$model" \
       -c model_reasoning_effort=xhigh \
       -c stream_idle_timeout_ms=3600000 \
-      "$prompt" 2>&1 | tee "$tmpfile"
+      "$prompt" 2>&1 | tee "$logfile"
   else
     codex exec \
       --sandbox "$sandbox" \
@@ -214,7 +214,7 @@ run_codex() {
       -c model="$model" \
       -c model_reasoning_effort=xhigh \
       -c stream_idle_timeout_ms=3600000 \
-      "$prompt" > "$tmpfile" 2>&1
+      "$prompt" 2>&1 | tee "$logfile" > /dev/null
   fi
 }
 
@@ -226,6 +226,7 @@ echo "  model:    $MODEL"
 echo "  prompt:   $PROMPT_DISPLAY"
 echo "  max:      $([ "$MAX" -gt 0 ] 2>/dev/null && echo "$MAX" || echo "unlimited")"
 echo "  human:    $([ "$HUMAN_BLOCK" = "1" ] && echo "block" || echo "defer")"
+echo "  logs:     $LOG_DIR/"
 echo ""
 
 # ── session logs ─────────────────────────────────────────────────────
@@ -246,17 +247,18 @@ while true; do
   # build prompt fresh each round (re-reads files, allows mid-loop edits)
   FULL_PROMPT=$(build_prompt)
 
-  TMPFILE=$(mktemp)
+  # log file created before executor — tail -f to watch live
+  LOG_FILE=$(printf "%s/round-%03d.log" "$LOG_DIR" "$ROUND")
+  > "$LOG_FILE"
 
-  # dispatch to executor
+  # dispatch to executor (streams to log file in real-time)
   case "$EXECUTOR" in
-    claude-code) run_claude "$FULL_PROMPT" "$MODEL" "$TMPFILE" ;;
-    codex)       run_codex  "$FULL_PROMPT" "$MODEL" "$TMPFILE" ;;
+    claude-code) run_claude "$FULL_PROMPT" "$MODEL" "$LOG_FILE" ;;
+    codex)       run_codex  "$FULL_PROMPT" "$MODEL" "$LOG_FILE" ;;
   esac
 
   EXIT_CODE=$?
-  OUTPUT=$(cat "$TMPFILE")
-  rm -f "$TMPFILE"
+  OUTPUT=$(cat "$LOG_FILE")
 
   ELAPSED=$(( $(date +%s) - START ))
 
@@ -276,13 +278,10 @@ while true; do
   # skip empty responses
   if [ -z "$OUTPUT" ]; then
     echo "  ⚠ empty response (${ELAPSED}s) — agent produced no output"
+    rm -f "$LOG_FILE"
     sleep 2
     continue
   fi
-
-  # save log
-  LOG_FILE=$(printf "%s/round-%03d.log" "$LOG_DIR" "$ROUND")
-  echo "$OUTPUT" > "$LOG_FILE"
 
   # ── short round detection ───────────────────────────────────────────
   if [ "$ELAPSED" -lt 5 ]; then
