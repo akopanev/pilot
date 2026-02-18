@@ -130,20 +130,45 @@ build_prompt() {
   echo "$result"
 }
 
+# ── jq filter for extracting text from claude stream-json ─────────────
+# handles all 4 event types: assistant, content_block_delta, message_stop, result
+JQ_STREAM='
+  if .type == "content_block_delta" and .delta?.type == "text_delta" then
+    .delta.text // empty
+  elif .type == "assistant" then
+    ([.message?.content[]? | select(.type == "text") | .text] | join(""))
+  elif .type == "message_stop" then
+    ([.message?.content[]? | select(.type == "text") | .text] | join(""))
+  elif .type == "result" and (.result?.output | type) == "object" then
+    ([.result.output.content[]? | select(.type == "text") | .text] | join(""))
+  else empty end
+'
+
 # ── executor functions ────────────────────────────────────────────────
 
 run_claude() {
   local prompt="$1" model="$2" tmpfile="$3"
+  local streamfile
+  streamfile=$(mktemp)
 
+  # always use stream-json for proper event parsing
   if [ "$VERBOSE" = "1" ]; then
     claude -p --dangerously-skip-permissions \
       --model "$model" --verbose \
-      "$prompt" 2>&1 | tee "$tmpfile"
+      --output-format stream-json \
+      "$prompt" 2>&1 | tee "$streamfile" | \
+      jq --unbuffered -rj "$JQ_STREAM" 2>/dev/null
+    echo ""
   else
     claude -p --dangerously-skip-permissions \
       --model "$model" --verbose \
-      "$prompt" > "$tmpfile" 2>&1
+      --output-format stream-json \
+      "$prompt" > "$streamfile" 2>&1
   fi
+
+  # extract plain text from NDJSON for signal parsing
+  jq -rj "$JQ_STREAM" < "$streamfile" > "$tmpfile" 2>/dev/null
+  rm -f "$streamfile"
 }
 
 run_codex() {
