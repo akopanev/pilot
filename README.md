@@ -29,18 +29,18 @@ Creates `.pilot/` in your project. Add `.pilot/` to `.gitignore` or commit it �
 
 ```bash
 # bare metal — claude-code (default executor)
-./pilot.sh opus PROMPT.md
-./pilot.sh opus "fix the login bug" --max-rounds 10
+.pilot/pilot.sh opus PROMPT.md
+.pilot/pilot.sh opus "fix the login bug" --max-rounds 10
 
 # bare metal — codex
-./pilot.sh o3 PROMPT.md --executor codex
+.pilot/pilot.sh o3 PROMPT.md --executor codex
 
 # docker (handles auth, mounts workspace)
-./scripts/pilot-docker.sh opus PROMPT.md
-./scripts/pilot-docker.sh o3 PROMPT.md --executor codex
+.pilot/scripts/pilot-docker.sh opus PROMPT.md
+.pilot/scripts/pilot-docker.sh o3 PROMPT.md --executor codex
 
-# first docker run (or after changes)
-./scripts/pilot-docker.sh --build opus PROMPT.md
+# docker — first run or after changes
+.pilot/scripts/pilot-docker.sh --build opus PROMPT.md
 ```
 
 ## Executors
