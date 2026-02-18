@@ -228,6 +228,11 @@ echo "  max:      $([ "$MAX" -gt 0 ] 2>/dev/null && echo "$MAX" || echo "unlimit
 echo "  human:    $([ "$HUMAN_BLOCK" = "1" ] && echo "block" || echo "defer")"
 echo ""
 
+# ── session logs ─────────────────────────────────────────────────────
+SESSION_ID=$(date +%Y-%m-%d_%H%M%S)
+LOG_DIR=".pilot/logs/$SESSION_ID"
+mkdir -p "$LOG_DIR"
+
 # ── main loop ─────────────────────────────────────────────────────────
 ROUND=0
 FAILURES=0
@@ -251,6 +256,8 @@ while true; do
 
   EXIT_CODE=$?
   OUTPUT=$(cat "$TMPFILE")
+  LOG_FILE=$(printf "%s/round-%03d.log" "$LOG_DIR" "$ROUND")
+  cp "$TMPFILE" "$LOG_FILE"
   rm -f "$TMPFILE"
 
   ELAPSED=$(( $(date +%s) - START ))
