@@ -1,83 +1,119 @@
 # pilot
 
-Fresh-context loop for AI-driven development. Runs an AI tool repeatedly, each round with a clean context window. Your methodology manages state via files on disk — pilot just keeps the loop going.
+Fresh-context orchestrator for AI-driven development.
 
-## How it works
+Runs any methodology (GSD, BMAD, Ralph, custom) in a loop — each round gets a clean context window. The methodology manages its own state via files on disk. Pilot just keeps the loop going.
 
-```
-while true:
-    read prompt (file or inline text)
-    run executor (claude-code or codex) with prompt + loop signals
-    extract <loop:update> → print progress
-    if <loop:done> → exit
-    if <loop:failed> → stop with error
-```
-
-Each round is a fresh process — no memory of previous rounds. The methodology prompt tells the agent to read its state from disk, do one step, and stop. Pilot restarts it for the next step.
+**The value:** Your methodology defines *what* to build. Pilot handles *how* to execute it — fresh context per round, signal-based flow control, multi-prompt composition. Model/executor switching is WIP.
 
 ## Install
-
-Run from your project root:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/akopanev/pilot/master/install.sh | bash
 ```
 
-Creates `.pilot/` in your project. Add `.pilot/` to `.gitignore` or commit it — your call.
+Creates `.pilot/` in your project.
 
-## Usage
+## Quick start
 
 ```bash
-# bare metal — claude-code (default executor)
-.pilot/pilot.sh opus PROMPT.md
-.pilot/pilot.sh opus "fix the login bug" --max-rounds 10
+# GSD methodology (included)
+.pilot/pilot.sh -m opus -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
 
-# bare metal — codex
-.pilot/pilot.sh o3 PROMPT.md --executor codex
+# stack prompts: methodology + context + instructions
+.pilot/pilot.sh -m opus -p .pilot/prompts/gsd.md -p BRIEF.md -p "skip research phase" -e claude-code -n 20
 
-# docker (handles auth, mounts workspace)
-.pilot/scripts/pilot-docker.py opus PROMPT.md
-.pilot/scripts/pilot-docker.py o3 PROMPT.md --executor codex
+# any methodology — just point at your prompt
+.pilot/pilot.sh -m opus -p my-workflow.md -e claude-code -n 10
 
-# docker — first run or after changes
-.pilot/scripts/pilot-docker.py --build opus PROMPT.md
+# codex + o3
+.pilot/pilot.sh -m o3 -p PROMPT.md -e codex -n 10
+
+# verbose — stream agent output live
+.pilot/pilot.sh -m opus -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20 -v
 ```
 
-## Executors
+## How it works
 
-| Executor | CLI | Auth |
-|----------|-----|------|
-| `claude-code` (default) | `claude -p --dangerously-skip-permissions --model MODEL` | macOS Keychain or `ANTHROPIC_API_KEY` |
-| `codex` | `codex exec --sandbox full-auto --model MODEL` | `~/.codex/` config or `OPENAI_API_KEY` |
+```
+while true:
+    read prompts (files + inline text, concatenated)
+    run executor with prompt + loop signals
+    if <loop:update> → print progress in real-time
+    if <loop:done> → exit
+    if <loop:failed> → stop with error
+    next round (fresh context)
+```
+
+Each round is a fresh process. The agent reads state from disk, does one step, updates state, exits. Pilot restarts it for the next step. The methodology controls the flow — pilot is just the loop.
+
+## Prompts
+
+Pilot is methodology-agnostic. Pass one or more `-p` flags — they get concatenated:
+
+```bash
+.pilot/pilot.sh -m opus -p methodology.md -p project-brief.md -p extra-context.md -e claude-code -n 20
+```
+
+Files are re-read each round, so you can edit mid-loop.
+
+**Included:**
+- `prompts/gsd.md` — [GSD (Get Shit Done)](https://github.com/pashpashpash/get-shit-done) loop adapter
+
+**Works with any methodology** that manages state via files: BMAD, Ralph, Compound Engineering, or your own.
 
 ## Signals
 
-The agent emits XML signals that pilot extracts:
+Appended to every prompt automatically. The agent emits:
 
-- `<loop:update>status message</loop:update>` — progress updates, printed as they occur
+- `<loop:update>status</loop:update>` — progress, printed in real-time
 - `<loop:done>summary</loop:done>` — all work complete, loop exits (exit 0)
-- `<loop:failed>reason</loop:failed>` — agent is stuck, loop stops (exit 1)
+- `<loop:failed>reason</loop:failed>` — stuck or blocked, loop stops (exit 1)
 
-These are appended to every prompt automatically.
+## Options
+
+```
+pilot.sh -m <model> -p <prompt> [-p ...] -e <executor> -n <max-rounds> [-v]
+
+-m, --model <name>        model to use (e.g. opus, o3)
+-p, --prompt <file|text>  prompt file or inline text (repeatable)
+-e, --executor <tool>     claude-code, codex
+-n, --max-rounds <n>      max loop iterations (0 = unlimited)
+-v, --verbose             stream agent output live
+```
+
+All parameters except `-v` are required.
 
 ## Safety
 
-- **MAX=50** rounds by default (override with `--max-rounds N`, `0` for unlimited)
-- **3 consecutive failures** → stops automatically
-- **Short round detection** — warns if a round completes in under 5 seconds
+- **Max rounds** enforced via `-n`
+- **3 consecutive failures** → auto-stop
+- **Short round detection** — warns if round < 5 seconds
+
+## Docker
+
+```bash
+# first run (builds image)
+.pilot/scripts/pilot-docker.py --build -m opus -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
+
+# subsequent runs
+.pilot/scripts/pilot-docker.py -m opus -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
+```
+
+Handles macOS Keychain extraction, credential forwarding, workspace mounting. See [Docker details](#docker-details) below.
 
 ## Files
 
 ```
 pilot.sh                    # the loop
-scripts/pilot-docker.py     # docker launcher (keychain extraction, volume mounts)
-scripts/init-docker.sh      # container init (credential setup)
+prompts/gsd.md              # GSD methodology adapter
+scripts/pilot-docker.py     # docker launcher
+scripts/init-docker.sh      # container credential setup
 Dockerfile                  # node:22 + claude-code + codex + gh + python3
 ```
 
 ## Docker details
 
-The Docker setup handles:
 - macOS Keychain extraction for subscription-based Claude auth
 - Selective credential copy (skips multi-GB cache)
 - Codex config (`~/.codex/`) forwarded
@@ -85,10 +121,4 @@ The Docker setup handles:
 - `.gitconfig` forwarded
 - `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` pass-through
 - Non-root user with matching UID
-- Codex uses `danger-full-access` sandbox in Docker (detected via `PILOT_DOCKER=1`)
-
-## Writing prompts
-
-Pilot is methodology-agnostic. Your prompt file defines what the agent does — including how state is managed. That's up to your methodology (BMAD, GSD, Ralph, etc.), not pilot.
-
-The key contract: **state lives in files, not in memory**. Each round reads state from disk, does one step, writes updated state. Pilot just runs the loop.
+- Codex sandbox: `danger-full-access` in Docker (`PILOT_DOCKER=1`)

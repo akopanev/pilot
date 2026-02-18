@@ -3,60 +3,60 @@
 set -uo pipefail
 
 # ── defaults ──────────────────────────────────────────────────────────
-EXECUTOR="claude-code"
+EXECUTOR=""
 MODEL=""
 PROMPTS=()
-MAX=50  # safety default — pass --max-rounds 0 for unlimited
+MAX=""
 VERBOSE=0
 
 # ── parse args ────────────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help)
-      echo "usage: pilot.sh <model> <prompts...> [options]"
+      echo "usage: pilot.sh -m <model> -p <prompt> [-p <prompt>...] [options]"
+      echo ""
+      echo "required:"
+      echo "  -m, --model <name>       model to use (e.g. opus, o3)"
+      echo "  -p, --prompt <file|text>  prompt file or inline text (repeatable)"
       echo ""
       echo "options:"
-      echo "  --executor <tool>    claude-code (default), codex"
-      echo "  --max-rounds <n>     max loop iterations (default: 50, 0=unlimited)"
-      echo "  --verbose            stream agent output live"
+      echo "  -e, --executor <tool>    claude-code, codex"
+      echo "  -n, --max-rounds <n>     max loop iterations (0 = unlimited)"
+      echo "  -v, --verbose            stream agent output live"
       echo ""
       echo "examples:"
-      echo "  .pilot/pilot.sh opus PROMPT.md"
-      echo "  .pilot/pilot.sh opus gsd.md brief.md context.md"
-      echo '  .pilot/pilot.sh opus gsd.md "also fix the login bug"'
-      echo "  .pilot/pilot.sh o3 PROMPT.md --executor codex"
-      echo "  .pilot/pilot.sh opus PROMPT.md --max-rounds 20"
+      echo "  pilot.sh -m opus -p gsd.md -p BRIEF.md -e claude-code -n 20"
+      echo "  pilot.sh -m opus -p gsd.md -p BRIEF.md -p \"skip research\""
+      echo "  pilot.sh -m o3 -p PROMPT.md -e codex -n 10"
       exit 0
       ;;
-    --executor) EXECUTOR="$2"; shift 2 ;;
-    --max-rounds) MAX="$2"; shift 2 ;;
-    --verbose) VERBOSE=1; shift ;;
+    -m|--model) MODEL="$2"; shift 2 ;;
+    -p|--prompt) PROMPTS+=("$2"); shift 2 ;;
+    -e|--executor) EXECUTOR="$2"; shift 2 ;;
+    -n|--max-rounds) MAX="$2"; shift 2 ;;
+    -v|--verbose) VERBOSE=1; shift ;;
     *)
-      if [ -z "$MODEL" ]; then
-        MODEL="$1"
-      else
-        PROMPTS+=("$1")
-      fi
-      shift
+      echo "error: unknown option '$1'"
+      echo "run pilot.sh --help for usage"
+      exit 1
       ;;
   esac
 done
 
 # ── validate ──────────────────────────────────────────────────────────
-if [ -z "$MODEL" ]; then
-  echo "error: no model given"
-  echo "usage: pilot.sh <model> <prompts...> [options]"
-  exit 1
-fi
+MISSING=()
+[ -z "$MODEL" ] && MISSING+=("--model (-m)")
+[ ${#PROMPTS[@]} -eq 0 ] && MISSING+=("--prompt (-p)")
+[ -z "$EXECUTOR" ] && MISSING+=("--executor (-e)")
+[ -z "$MAX" ] && MISSING+=("--max-rounds (-n)")
 
-if [ ${#PROMPTS[@]} -eq 0 ]; then
-  echo "error: no prompt given"
+if [ ${#MISSING[@]} -gt 0 ]; then
+  echo "error: missing required params: ${MISSING[*]}"
   echo ""
-  echo "usage: pilot.sh <model> <prompts...> [options]"
+  echo "usage: pilot.sh -m <model> -p <prompt> -e <executor> -n <max-rounds>"
   echo ""
-  echo "  .pilot/pilot.sh opus PROMPT.md"
-  echo "  .pilot/pilot.sh opus gsd.md brief.md context.md"
-  echo "  .pilot/pilot.sh --help"
+  echo "  pilot.sh -m opus -p gsd.md -p BRIEF.md -e claude-code -n 20"
+  echo "  pilot.sh --help"
   exit 1
 fi
 
