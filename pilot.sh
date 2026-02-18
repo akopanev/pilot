@@ -5,7 +5,7 @@ set -uo pipefail
 # ── defaults ──────────────────────────────────────────────────────────
 EXECUTOR="claude-code"
 MODEL=""
-PROMPT=""
+PROMPTS=()
 MAX=50  # safety default — pass --max-rounds 0 for unlimited
 VERBOSE=0
 
@@ -13,7 +13,7 @@ VERBOSE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help)
-      echo "usage: pilot.sh <model> <prompt-or-file> [options]"
+      echo "usage: pilot.sh <model> <prompts...> [options]"
       echo ""
       echo "options:"
       echo "  --executor <tool>    claude-code (default), codex"
@@ -22,7 +22,8 @@ while [ $# -gt 0 ]; do
       echo ""
       echo "examples:"
       echo "  .pilot/pilot.sh opus PROMPT.md"
-      echo '  .pilot/pilot.sh opus "fix the login bug"'
+      echo "  .pilot/pilot.sh opus gsd.md brief.md context.md"
+      echo '  .pilot/pilot.sh opus gsd.md "also fix the login bug"'
       echo "  .pilot/pilot.sh o3 PROMPT.md --executor codex"
       echo "  .pilot/pilot.sh opus PROMPT.md --max-rounds 20"
       exit 0
@@ -34,7 +35,7 @@ while [ $# -gt 0 ]; do
       if [ -z "$MODEL" ]; then
         MODEL="$1"
       else
-        PROMPT="$1"
+        PROMPTS+=("$1")
       fi
       shift
       ;;
@@ -44,17 +45,17 @@ done
 # ── validate ──────────────────────────────────────────────────────────
 if [ -z "$MODEL" ]; then
   echo "error: no model given"
-  echo "usage: pilot.sh <model> <prompt-or-file> [options]"
+  echo "usage: pilot.sh <model> <prompts...> [options]"
   exit 1
 fi
 
-if [ -z "$PROMPT" ]; then
+if [ ${#PROMPTS[@]} -eq 0 ]; then
   echo "error: no prompt given"
   echo ""
-  echo "usage: pilot.sh <model> <prompt-or-file> [options]"
+  echo "usage: pilot.sh <model> <prompts...> [options]"
   echo ""
   echo "  .pilot/pilot.sh opus PROMPT.md"
-  echo '  .pilot/pilot.sh opus "fix the login bug"'
+  echo "  .pilot/pilot.sh opus gsd.md brief.md context.md"
   echo "  .pilot/pilot.sh --help"
   exit 1
 fi
@@ -68,16 +69,16 @@ case "$EXECUTOR" in
     ;;
 esac
 
-# ── prompt source ─────────────────────────────────────────────────────
-if [ -f "$PROMPT" ]; then
-  PROMPT_SOURCE="file"
-  PROMPT_FILE="$PROMPT"
-  PROMPT_DISPLAY="$PROMPT_FILE"
-else
-  PROMPT_SOURCE="text"
-  PROMPT_TEXT="$PROMPT"
-  PROMPT_DISPLAY="${PROMPT_TEXT:0:60}$([ ${#PROMPT_TEXT} -gt 60 ] && echo '...')"
-fi
+# ── prompt display ────────────────────────────────────────────────────
+PROMPT_DISPLAY=""
+for p in "${PROMPTS[@]}"; do
+  if [ -f "$p" ]; then
+    PROMPT_DISPLAY="${PROMPT_DISPLAY:+$PROMPT_DISPLAY + }$p"
+  else
+    SHORT="${p:0:40}$([ ${#p} -gt 40 ] && echo '...')"
+    PROMPT_DISPLAY="${PROMPT_DISPLAY:+$PROMPT_DISPLAY + }\"$SHORT\""
+  fi
+done
 
 # ── signals appended to every prompt ──────────────────────────────────
 SIGNALS='
@@ -113,6 +114,20 @@ Do ONE step only. Read your state, figure out what the single next step is in yo
 extract_signals() {
   local tag="$1" input="$2"
   echo "$input" | sed -n "s/.*<loop:${tag}>\(.*\)<\/loop:${tag}>.*/\1/p"
+}
+
+# ── build prompt ──────────────────────────────────────────────────────
+build_prompt() {
+  local result=""
+  for p in "${PROMPTS[@]}"; do
+    if [ -f "$p" ]; then
+      result="${result}$(cat "$p")"$'\n\n'
+    else
+      result="${result}${p}"$'\n\n'
+    fi
+  done
+  result="${result}${SIGNALS}"
+  echo "$result"
 }
 
 # ── executor functions ────────────────────────────────────────────────
@@ -177,12 +192,8 @@ while true; do
   echo "━━━ round $ROUND ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   START=$(date +%s)
 
-  # read file fresh each round (allows mid-loop edits) or use inline text
-  if [ "$PROMPT_SOURCE" = "file" ]; then
-    FULL_PROMPT="$(cat "$PROMPT_FILE")${SIGNALS}"
-  else
-    FULL_PROMPT="${PROMPT_TEXT}${SIGNALS}"
-  fi
+  # build prompt fresh each round (re-reads files, allows mid-loop edits)
+  FULL_PROMPT=$(build_prompt)
 
   TMPFILE=$(mktemp)
 

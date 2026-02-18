@@ -141,9 +141,9 @@ def build_volumes(creds_temp, claude_home):
 # --- run ---
 
 def run_docker(image, volumes, args):
-    cmd = ["docker", "run"]
+    cmd = ["docker", "run", "-t"]
     if sys.stdin.isatty():
-        cmd.append("-it")
+        cmd.append("-i")
     cmd.append("--rm")
 
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
