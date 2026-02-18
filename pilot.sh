@@ -8,6 +8,7 @@ MODEL=""
 PROMPTS=()
 MAX=""
 VERBOSE=0
+HUMAN_BLOCK=0
 
 # ── parse args ────────────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
@@ -23,6 +24,7 @@ while [ $# -gt 0 ]; do
       echo "  -e, --executor <tool>    claude-code, codex"
       echo "  -n, --max-rounds <n>     max loop iterations (0 = unlimited)"
       echo "  -v, --verbose            stream agent output live"
+      echo "  --human-block            stop loop on <loop:human> signals"
       echo ""
       echo "examples:"
       echo "  pilot.sh -m opus -p gsd.md -p BRIEF.md -e claude-code -n 20"
@@ -35,6 +37,7 @@ while [ $# -gt 0 ]; do
     -e|--executor) EXECUTOR="$2"; shift 2 ;;
     -n|--max-rounds) MAX="$2"; shift 2 ;;
     -v|--verbose) VERBOSE=1; shift ;;
+    --human-block) HUMAN_BLOCK=1; shift ;;
     *)
       echo "error: unknown option '$1'"
       echo "run pilot.sh --help for usage"
@@ -99,10 +102,14 @@ Emit these XML signals during your work:
 - <loop:failed>reason</loop:failed>
   When you are stuck, blocked, or cannot proceed. The loop will stop.
 
+- <loop:human>question or action needed</loop:human>
+  When you need human input — credentials, decisions, approvals, manual steps. Describe what you need clearly. The question will be logged and the human will answer. Previous Q&A history (if any) is included in your prompt.
+
 Rules:
 - Emit <loop:update> on meaningful progress so the operator can follow along
 - <loop:done> means everything is finished, not just this round
 - <loop:failed> means you cannot continue — unrecoverable error, missing dependency, conflicting requirements
+- <loop:human> means you need human input — the loop may continue or pause depending on configuration
 - If you do not emit <loop:done> or <loop:failed>, the loop continues automatically
 
 # Scope
@@ -117,6 +124,8 @@ extract_signals() {
 }
 
 # ── build prompt ──────────────────────────────────────────────────────
+HUMAN_FILE=".pilot/human.md"
+
 build_prompt() {
   local result=""
   for p in "${PROMPTS[@]}"; do
@@ -126,6 +135,13 @@ build_prompt() {
       result="${result}${p}"$'\n\n'
     fi
   done
+
+  # auto-inject human Q&A history if it exists
+  if [ -f "$HUMAN_FILE" ]; then
+    result="${result}# Human Q&A History"$'\n'
+    result="${result}$(cat "$HUMAN_FILE")"$'\n\n'
+  fi
+
   result="${result}${SIGNALS}"
   echo "$result"
 }
@@ -209,6 +225,7 @@ echo "  executor: $EXECUTOR"
 echo "  model:    $MODEL"
 echo "  prompt:   $PROMPT_DISPLAY"
 echo "  max:      $([ "$MAX" -gt 0 ] 2>/dev/null && echo "$MAX" || echo "unlimited")"
+echo "  human:    $([ "$HUMAN_BLOCK" = "1" ] && echo "block" || echo "defer")"
 echo ""
 
 # ── main loop ─────────────────────────────────────────────────────────
@@ -285,6 +302,27 @@ while true; do
     [ -n "$REASON" ] && echo "  ↳ $REASON"
     echo ""
     exit 1
+  fi
+
+  # check <loop:human> — always log, optionally stop
+  if echo "$OUTPUT" | grep -q "<loop:human"; then
+    QUESTION=$(extract_signals "human" "$OUTPUT" | tail -1)
+    if [ -n "$QUESTION" ]; then
+      mkdir -p .pilot
+      echo "" >> "$HUMAN_FILE"
+      echo "## Round $ROUND" >> "$HUMAN_FILE"
+      echo "Q: $QUESTION" >> "$HUMAN_FILE"
+      echo "A: " >> "$HUMAN_FILE"
+      echo ""
+      echo "  ? human input needed → $HUMAN_FILE"
+      echo "  ↳ $QUESTION"
+      if [ "$HUMAN_BLOCK" = "1" ]; then
+        echo ""
+        echo "  ⏸ stopped (--human-block). Answer in $HUMAN_FILE and re-run."
+        echo ""
+        exit 0
+      fi
+    fi
   fi
 
   sleep 2

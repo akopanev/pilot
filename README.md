@@ -69,6 +69,7 @@ Appended to every prompt automatically. The agent emits:
 - `<loop:update>status</loop:update>` — progress, printed in real-time
 - `<loop:done>summary</loop:done>` — all work complete, loop exits (exit 0)
 - `<loop:failed>reason</loop:failed>` — stuck or blocked, loop stops (exit 1)
+- `<loop:human>question</loop:human>` — needs human input, logged to `.pilot/human.md`
 
 ## Options
 
@@ -80,9 +81,12 @@ pilot.sh -m <model> -p <prompt> [-p ...] -e <executor> -n <max-rounds> [-v]
 -e, --executor <tool>     claude-code, codex
 -n, --max-rounds <n>      max loop iterations (0 = unlimited)
 -v, --verbose             stream agent output live
+--human-block             stop loop on <loop:human> signals (default: defer)
 ```
 
-All parameters except `-v` are required.
+All parameters except `-v` and `--human-block` are required.
+
+**Human-in-the-loop:** When the agent needs human input (credentials, decisions, approvals), it emits `<loop:human>`. The question is always logged to `.pilot/human.md`. By default the loop continues (defer) — questions accumulate and you batch-answer later. With `--human-block`, the loop stops and waits for you to answer in `human.md` before re-running.
 
 ## Safety
 
