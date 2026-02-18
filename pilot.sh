@@ -153,17 +153,21 @@ run_claude() {
 
   # always use stream-json for proper event parsing
   if [ "$VERBOSE" = "1" ]; then
+    echo "  ┄┄┄"
     claude -p --dangerously-skip-permissions \
       --model "$model" --verbose \
       --output-format stream-json \
       "$prompt" 2>&1 | tee "$streamfile" | \
-      jq --unbuffered -rj "$JQ_STREAM" 2>/dev/null
+      jq --unbuffered -r "$JQ_STREAM" 2>/dev/null
     echo ""
+    echo "  ┄┄┄"
   else
     claude -p --dangerously-skip-permissions \
       --model "$model" --verbose \
       --output-format stream-json \
-      "$prompt" > "$streamfile" 2>&1
+      "$prompt" 2>&1 | tee "$streamfile" | \
+      jq --unbuffered -r "$JQ_STREAM" 2>/dev/null | \
+      sed -nu 's/.*<loop:update>\(.*\)<\/loop:update>.*/  ▸ \1/p'
   fi
 
   # extract plain text from NDJSON for signal parsing
