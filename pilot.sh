@@ -97,7 +97,7 @@ Emit these XML signals during your work:
   Emit freely as you hit milestones — starting a task, completed something, passed tests, found an issue, made a decision.
 
 - <loop:done>summary of completed work</loop:done>
-  ONLY when ALL work is fully complete. The loop will exit.
+  ONLY when the ENTIRE project is fully complete — all phases, all tasks, everything delivered. The loop will exit permanently. Do NOT emit this after completing a single step, phase, or sub-task. If there is more work remaining in your methodology, do NOT emit this.
 
 - <loop:failed>reason</loop:failed>
   When you are stuck, blocked, or cannot proceed. The loop will stop.
@@ -107,10 +107,11 @@ Emit these XML signals during your work:
 
 Rules:
 - Emit <loop:update> on meaningful progress so the operator can follow along
-- <loop:done> means everything is finished, not just this round
+- <loop:done> means the ENTIRE project is finished — not just this step or phase. If your methodology has more steps, do NOT emit done.
 - <loop:failed> means you cannot continue — unrecoverable error, missing dependency, conflicting requirements
 - <loop:human> means you need human input — the loop may continue or pause depending on configuration
 - If you do not emit <loop:done> or <loop:failed>, the loop continues automatically
+- When in doubt, do NOT emit <loop:done>. Just finish your step and exit — the loop will bring you back.
 
 # Scope
 
