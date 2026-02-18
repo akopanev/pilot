@@ -175,8 +175,7 @@ run_claude() {
       --output-format stream-json \
       "$prompt" 2>&1 | tee "$streamfile" | \
       jq --unbuffered -r "$JQ_STREAM" 2>/dev/null | \
-      tee -a "$logfile"
-    echo ""
+      cat -s
     echo "  ┄┄┄"
   else
     claude -p --dangerously-skip-permissions \
@@ -184,10 +183,11 @@ run_claude() {
       --output-format stream-json \
       "$prompt" 2>&1 | tee "$streamfile" | \
       jq --unbuffered -r "$JQ_STREAM" 2>/dev/null | \
-      tee -a "$logfile" | \
       sed -nu 's/.*<loop:update>\(.*\)<\/loop:update>.*/  ▸ \1/p'
   fi
 
+  # extract clean text for log (jq -rj joins without extra newlines)
+  jq -rj "$JQ_STREAM" < "$streamfile" > "$logfile" 2>/dev/null
   rm -f "$streamfile"
 }
 
@@ -214,7 +214,7 @@ run_codex() {
       -c model="$model" \
       -c model_reasoning_effort=xhigh \
       -c stream_idle_timeout_ms=3600000 \
-      "$prompt" 2>&1 | tee "$logfile" > /dev/null
+      "$prompt" > "$logfile" 2>&1
   fi
 }
 
