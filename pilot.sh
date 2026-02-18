@@ -256,8 +256,6 @@ while true; do
 
   EXIT_CODE=$?
   OUTPUT=$(cat "$TMPFILE")
-  LOG_FILE=$(printf "%s/round-%03d.log" "$LOG_DIR" "$ROUND")
-  cp "$TMPFILE" "$LOG_FILE"
   rm -f "$TMPFILE"
 
   ELAPSED=$(( $(date +%s) - START ))
@@ -265,7 +263,6 @@ while true; do
   # ── handle agent failures ───────────────────────────────────────────
   if [ "$EXIT_CODE" -ne 0 ]; then
     FAILURES=$((FAILURES + 1))
-    echo ""
     echo "  ⚠ agent exited $EXIT_CODE ($FAILURES/3 consecutive failures)"
     if [ "$FAILURES" -ge 3 ]; then
       echo "  ✗ 3 consecutive failures, stopping."
@@ -276,38 +273,43 @@ while true; do
   fi
   FAILURES=0
 
+  # skip empty responses
+  if [ -z "$OUTPUT" ]; then
+    echo "  ⚠ empty response (${ELAPSED}s) — agent produced no output"
+    sleep 2
+    continue
+  fi
+
+  # save log
+  LOG_FILE=$(printf "%s/round-%03d.log" "$LOG_DIR" "$ROUND")
+  echo "$OUTPUT" > "$LOG_FILE"
+
   # ── short round detection ───────────────────────────────────────────
   if [ "$ELAPSED" -lt 5 ]; then
-    echo ""
     echo "  ⚠ round too short (${ELAPSED}s) — agent may be stuck"
   fi
 
   # ── extract signals ─────────────────────────────────────────────────
   UPDATES=$(extract_signals "update" "$OUTPUT")
 
-  echo ""
   echo "  round $ROUND · ${ELAPSED}s"
   while IFS= read -r line; do
     [ -n "$line" ] && echo "  ▸ $line"
   done <<< "$UPDATES"
 
-  # check <loop:done> — matches <loop:done>, <loop:done/>, <loop:done />
+  # check <loop:done>
   if echo "$OUTPUT" | grep -q "<loop:done"; then
     SUMMARY=$(extract_signals "done" "$OUTPUT" | tail -1)
-    echo ""
     echo "  ✓ done in $ROUND round(s)"
     [ -n "$SUMMARY" ] && echo "  ↳ $SUMMARY"
-    echo ""
     break
   fi
 
   # check <loop:failed>
   if echo "$OUTPUT" | grep -q "<loop:failed"; then
     REASON=$(extract_signals "failed" "$OUTPUT" | tail -1)
-    echo ""
     echo "  ✗ agent reported failure at round $ROUND"
     [ -n "$REASON" ] && echo "  ↳ $REASON"
-    echo ""
     exit 1
   fi
 
@@ -320,13 +322,10 @@ while true; do
       echo "## Round $ROUND" >> "$HUMAN_FILE"
       echo "Q: $QUESTION" >> "$HUMAN_FILE"
       echo "A: " >> "$HUMAN_FILE"
-      echo ""
       echo "  ? human input needed → $HUMAN_FILE"
       echo "  ↳ $QUESTION"
       if [ "$HUMAN_BLOCK" = "1" ]; then
-        echo ""
         echo "  ⏸ stopped (--human-block). Answer in $HUMAN_FILE and re-run."
-        echo ""
         exit 0
       fi
     fi
