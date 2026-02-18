@@ -218,6 +218,11 @@ run_codex() {
   fi
 }
 
+# ── session logs ─────────────────────────────────────────────────────
+SESSION_ID=$(date +%Y-%m-%d_%H%M%S)
+LOG_DIR=".pilot/logs/$SESSION_ID"
+mkdir -p "$LOG_DIR"
+
 # ── banner ────────────────────────────────────────────────────────────
 echo ""
 echo "  pilot"
@@ -228,11 +233,6 @@ echo "  max:      $([ "$MAX" -gt 0 ] 2>/dev/null && echo "$MAX" || echo "unlimit
 echo "  human:    $([ "$HUMAN_BLOCK" = "1" ] && echo "block" || echo "defer")"
 echo "  logs:     $LOG_DIR/"
 echo ""
-
-# ── session logs ─────────────────────────────────────────────────────
-SESSION_ID=$(date +%Y-%m-%d_%H%M%S)
-LOG_DIR=".pilot/logs/$SESSION_ID"
-mkdir -p "$LOG_DIR"
 
 # ── main loop ─────────────────────────────────────────────────────────
 ROUND=0
