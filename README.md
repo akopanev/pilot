@@ -20,7 +20,7 @@ Each round is a fresh process — no memory of previous rounds. The methodology 
 Run from your project root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/akopanev/pilot/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/akopanev/pilot/master/install.sh | bash
 ```
 
 Creates `.pilot/` in your project. Add `.pilot/` to `.gitignore` or commit it — your call.

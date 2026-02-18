@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="https://raw.githubusercontent.com/akopanev/pilot/main"
+REPO="https://raw.githubusercontent.com/akopanev/pilot/master"
 INSTALL_DIR="${PILOT_INSTALL_DIR:-.pilot}"
 
 echo "installing pilot to $INSTALL_DIR..."
