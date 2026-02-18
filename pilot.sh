@@ -7,6 +7,7 @@ EXECUTOR="claude-code"
 MODEL=""
 PROMPT=""
 MAX=50  # safety default — pass --max-rounds 0 for unlimited
+VERBOSE=0
 
 # ── parse args ────────────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
@@ -17,6 +18,7 @@ while [ $# -gt 0 ]; do
       echo "options:"
       echo "  --executor <tool>    claude-code (default), codex"
       echo "  --max-rounds <n>     max loop iterations (default: 50, 0=unlimited)"
+      echo "  --verbose            stream agent output live"
       echo ""
       echo "examples:"
       echo "  .pilot/pilot.sh opus PROMPT.md"
@@ -27,6 +29,7 @@ while [ $# -gt 0 ]; do
       ;;
     --executor) EXECUTOR="$2"; shift 2 ;;
     --max-rounds) MAX="$2"; shift 2 ;;
+    --verbose) VERBOSE=1; shift ;;
     *)
       if [ -z "$MODEL" ]; then
         MODEL="$1"
@@ -117,9 +120,15 @@ extract_signals() {
 run_claude() {
   local prompt="$1" model="$2" tmpfile="$3"
 
-  claude -p --dangerously-skip-permissions \
-    --model "$model" --verbose \
-    "$prompt" 2>&1 | tee "$tmpfile"
+  if [ "$VERBOSE" = "1" ]; then
+    claude -p --dangerously-skip-permissions \
+      --model "$model" --verbose \
+      "$prompt" 2>&1 | tee "$tmpfile"
+  else
+    claude -p --dangerously-skip-permissions \
+      --model "$model" --verbose \
+      "$prompt" > "$tmpfile" 2>&1
+  fi
 }
 
 run_codex() {
@@ -130,13 +139,23 @@ run_codex() {
   local sandbox="full-auto"
   [ "${PILOT_DOCKER:-}" = "1" ] && sandbox="danger-full-access"
 
-  codex exec \
-    --sandbox "$sandbox" \
-    --skip-git-repo-check \
-    -c model="$model" \
-    -c model_reasoning_effort=xhigh \
-    -c stream_idle_timeout_ms=3600000 \
-    "$prompt" 2>&1 | tee "$tmpfile"
+  if [ "$VERBOSE" = "1" ]; then
+    codex exec \
+      --sandbox "$sandbox" \
+      --skip-git-repo-check \
+      -c model="$model" \
+      -c model_reasoning_effort=xhigh \
+      -c stream_idle_timeout_ms=3600000 \
+      "$prompt" 2>&1 | tee "$tmpfile"
+  else
+    codex exec \
+      --sandbox "$sandbox" \
+      --skip-git-repo-check \
+      -c model="$model" \
+      -c model_reasoning_effort=xhigh \
+      -c stream_idle_timeout_ms=3600000 \
+      "$prompt" > "$tmpfile" 2>&1
+  fi
 }
 
 # ── banner ────────────────────────────────────────────────────────────
