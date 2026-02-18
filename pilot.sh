@@ -165,8 +165,6 @@ JQ_STREAM='
 
 run_claude() {
   local prompt="$1" model="$2" logfile="$3"
-  local streamfile
-  streamfile=$(mktemp)
 
   # always use stream-json for proper event parsing
   if [ "$VERBOSE" = "1" ]; then
@@ -174,22 +172,22 @@ run_claude() {
     claude -p --dangerously-skip-permissions \
       --model "$model" --verbose \
       --output-format stream-json \
-      "$prompt" 2>&1 | tee "$streamfile" | \
+      "$prompt" 2>&1 | \
       jq --unbuffered -r "$JQ_STREAM" 2>/dev/null | \
-      cat -s
+      tee -a "$logfile" | cat -s
     echo "  ┄┄┄"
   else
     claude -p --dangerously-skip-permissions \
       --model "$model" --verbose \
       --output-format stream-json \
-      "$prompt" 2>&1 | tee "$streamfile" | \
+      "$prompt" 2>&1 | \
       jq --unbuffered -r "$JQ_STREAM" 2>/dev/null | \
+      tee -a "$logfile" | \
       sed -nu 's/.*<loop:update>\(.*\)<\/loop:update>.*/  ▸ \1/p'
   fi
 
-  # extract clean text for log (jq -rj joins without extra newlines)
-  jq -rj "$JQ_STREAM" < "$streamfile" > "$logfile" 2>/dev/null
-  rm -f "$streamfile"
+  # clean up blank lines in log
+  grep '.' "$logfile" > "$logfile.tmp" 2>/dev/null && mv "$logfile.tmp" "$logfile" || true
 }
 
 run_codex() {
