@@ -23,11 +23,6 @@ USER pilot
 # Docker environment marker (codex uses danger-full-access sandbox)
 ENV PILOT_DOCKER=1
 
-# Git safe.directory — workspace is host-mounted, ownership won't match
-ENV GIT_CONFIG_COUNT=1
-ENV GIT_CONFIG_KEY_0=safe.directory
-ENV GIT_CONFIG_VALUE_0=/workspace
-
 # Init script + loop script
 COPY --chmod=755 scripts/init-docker.sh /usr/local/bin/init-docker.sh
 COPY --chmod=755 pilot.sh /usr/local/bin/pilot

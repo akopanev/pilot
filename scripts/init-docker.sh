@@ -26,4 +26,7 @@ if [ -d /mnt/codex ]; then
     cp -rL /mnt/codex/* "$HOME/.codex/" 2>/dev/null || true
 fi
 
+# Git safe.directory — workspace is host-mounted, ownership won't match
+git config --global safe.directory /workspace
+
 exec "$@"

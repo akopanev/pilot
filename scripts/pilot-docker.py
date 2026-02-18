@@ -38,12 +38,13 @@ def ensure_image(image: str, build: bool) -> int:
         print(f"image '{image}' not found, building...", file=sys.stderr)
 
     print(f"building image '{image}' from {PROJECT_ROOT}...", file=sys.stderr)
-    rc = subprocess.run(
-        ["docker", "build",
-         "--build-arg", f"USER_UID={os.getuid()}",
-         "-t", image, str(PROJECT_ROOT)],
-        check=False,
-    ).returncode
+    cmd = ["docker", "build",
+           "--build-arg", f"USER_UID={os.getuid()}",
+           "-t", image]
+    if build:
+        cmd.append("--no-cache")
+    cmd.append(str(PROJECT_ROOT))
+    rc = subprocess.run(cmd, check=False).returncode
     if rc != 0:
         print("docker build failed", file=sys.stderr)
     return rc
