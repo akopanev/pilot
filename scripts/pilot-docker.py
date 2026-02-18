@@ -131,7 +131,7 @@ def build_volumes(creds_temp, claude_home):
     if codex_dir.is_dir():
         add(codex_dir.resolve(), "/mnt/codex", ro=True)
 
-    # .gitconfig
+    # .gitconfig (read-only, git safe.directory handled via ENV in Dockerfile)
     gitconfig = home / ".gitconfig"
     if gitconfig.exists():
         add(gitconfig.resolve(), "/home/pilot/.gitconfig", ro=True)
