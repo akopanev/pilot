@@ -12,17 +12,17 @@ MAX=50  # safety default — pass --max-rounds 0 for unlimited
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help)
-      echo "usage: ./pilot.sh <model> <prompt-or-file> [options]"
+      echo "usage: pilot.sh <model> <prompt-or-file> [options]"
       echo ""
       echo "options:"
       echo "  --executor <tool>    claude-code (default), codex"
       echo "  --max-rounds <n>     max loop iterations (default: 50, 0=unlimited)"
       echo ""
       echo "examples:"
-      echo "  ./pilot.sh opus PROMPT.md"
-      echo '  ./pilot.sh opus "fix the login bug"'
-      echo "  ./pilot.sh o3 PROMPT.md --executor codex"
-      echo "  ./pilot.sh opus PROMPT.md --max-rounds 20"
+      echo "  .pilot/pilot.sh opus PROMPT.md"
+      echo '  .pilot/pilot.sh opus "fix the login bug"'
+      echo "  .pilot/pilot.sh o3 PROMPT.md --executor codex"
+      echo "  .pilot/pilot.sh opus PROMPT.md --max-rounds 20"
       exit 0
       ;;
     --executor) EXECUTOR="$2"; shift 2 ;;
@@ -41,18 +41,18 @@ done
 # ── validate ──────────────────────────────────────────────────────────
 if [ -z "$MODEL" ]; then
   echo "error: no model given"
-  echo "usage: ./pilot.sh <model> <prompt-or-file> [options]"
+  echo "usage: pilot.sh <model> <prompt-or-file> [options]"
   exit 1
 fi
 
 if [ -z "$PROMPT" ]; then
   echo "error: no prompt given"
   echo ""
-  echo "usage: ./pilot.sh <model> <prompt-or-file> [options]"
+  echo "usage: pilot.sh <model> <prompt-or-file> [options]"
   echo ""
-  echo "  ./pilot.sh opus PROMPT.md"
-  echo '  ./pilot.sh opus "fix the login bug"'
-  echo "  ./pilot.sh --help"
+  echo "  .pilot/pilot.sh opus PROMPT.md"
+  echo '  .pilot/pilot.sh opus "fix the login bug"'
+  echo "  .pilot/pilot.sh --help"
   exit 1
 fi
 
@@ -173,7 +173,7 @@ while true; do
     codex)       run_codex  "$FULL_PROMPT" "$MODEL" "$TMPFILE" ;;
   esac
 
-  EXIT_CODE=${PIPESTATUS[0]}
+  EXIT_CODE=$?
   OUTPUT=$(cat "$TMPFILE")
   rm -f "$TMPFILE"
 

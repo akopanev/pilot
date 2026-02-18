@@ -18,7 +18,6 @@ import signal
 import subprocess
 import sys
 import tempfile
-import threading
 from pathlib import Path
 
 DEFAULT_IMAGE = "pilot:latest"
@@ -183,8 +182,8 @@ def main():
     if rc != 0:
         return rc
 
-    claude_home = Path(os.environ.get("CLAUDE_CONFIG_DIR", "")) or Path.home() / ".claude"
-    claude_home = Path(str(claude_home)).expanduser().resolve()
+    claude_config = os.environ.get("CLAUDE_CONFIG_DIR")
+    claude_home = Path(claude_config).expanduser().resolve() if claude_config else Path.home() / ".claude"
 
     creds_temp = extract_macos_credentials(claude_home)
     if creds_temp:
