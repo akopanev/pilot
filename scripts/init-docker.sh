@@ -13,7 +13,7 @@ if [ -d /mnt/claude ]; then
     done
 fi
 
-# Claude credentials extracted from macOS Keychain (mounted by pilot-docker.sh)
+# Claude credentials extracted from macOS Keychain (mounted by pilot-docker.py)
 if [ -f /mnt/claude-credentials.json ]; then
     mkdir -p "$HOME/.claude"
     cp /mnt/claude-credentials.json "$HOME/.claude/.credentials.json"

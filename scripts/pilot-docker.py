@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""pilot-docker.sh — run pilot.sh in Docker with credential forwarding.
+"""pilot-docker.py — run pilot.sh in Docker with credential forwarding.
 
 Handles macOS Keychain extraction so subscription-based Claude Code auth
 works inside the container.
 
 Usage:
-    pilot-docker.sh opus PROMPT.md --max-rounds 10
-    pilot-docker.sh --build opus PROMPT.md        # force rebuild image
+    pilot-docker.py opus PROMPT.md --max-rounds 10
+    pilot-docker.py --build opus PROMPT.md        # force rebuild image
 
 Run from your project directory — mounts $(pwd) as /workspace.
 """

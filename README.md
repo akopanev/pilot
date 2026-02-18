@@ -36,11 +36,11 @@ Creates `.pilot/` in your project. Add `.pilot/` to `.gitignore` or commit it â€
 .pilot/pilot.sh o3 PROMPT.md --executor codex
 
 # docker (handles auth, mounts workspace)
-.pilot/scripts/pilot-docker.sh opus PROMPT.md
-.pilot/scripts/pilot-docker.sh o3 PROMPT.md --executor codex
+.pilot/scripts/pilot-docker.py opus PROMPT.md
+.pilot/scripts/pilot-docker.py o3 PROMPT.md --executor codex
 
 # docker â€” first run or after changes
-.pilot/scripts/pilot-docker.sh --build opus PROMPT.md
+.pilot/scripts/pilot-docker.py --build opus PROMPT.md
 ```
 
 ## Executors
@@ -70,7 +70,7 @@ These are appended to every prompt automatically.
 
 ```
 pilot.sh                    # the loop
-scripts/pilot-docker.sh     # docker launcher (keychain extraction, volume mounts)
+scripts/pilot-docker.py     # docker launcher (keychain extraction, volume mounts)
 scripts/init-docker.sh      # container init (credential setup)
 Dockerfile                  # node:22 + claude-code + codex + gh + python3
 ```

@@ -12,9 +12,9 @@ curl -fsSL "$REPO/pilot.sh" -o "$INSTALL_DIR/pilot.sh"
 curl -fsSL "$REPO/Dockerfile" -o "$INSTALL_DIR/Dockerfile"
 curl -fsSL "$REPO/.dockerignore" -o "$INSTALL_DIR/.dockerignore"
 curl -fsSL "$REPO/scripts/init-docker.sh" -o "$INSTALL_DIR/scripts/init-docker.sh"
-curl -fsSL "$REPO/scripts/pilot-docker.sh" -o "$INSTALL_DIR/scripts/pilot-docker.sh"
+curl -fsSL "$REPO/scripts/pilot-docker.py" -o "$INSTALL_DIR/scripts/pilot-docker.py"
 curl -fsSL "$REPO/prompts/gsd.md" -o "$INSTALL_DIR/prompts/gsd.md"
-chmod +x "$INSTALL_DIR/pilot.sh" "$INSTALL_DIR/scripts/"*.sh
+chmod +x "$INSTALL_DIR/pilot.sh" "$INSTALL_DIR/scripts/"*
 
 echo "done."
 echo ""
