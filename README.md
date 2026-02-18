@@ -15,6 +15,16 @@ while true:
 
 Each round is a fresh process — no memory of previous rounds. The methodology prompt tells the agent to read its state from disk, do one step, and stop. Pilot restarts it for the next step.
 
+## Install
+
+Run from your project root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/akopanev/pilot/main/install.sh | bash
+```
+
+Creates `.pilot/` in your project. Add `.pilot/` to `.gitignore` or commit it — your call.
+
 ## Usage
 
 ```bash
