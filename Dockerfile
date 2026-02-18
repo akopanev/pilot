@@ -34,4 +34,3 @@ COPY --chmod=755 pilot.sh /usr/local/bin/pilot
 
 WORKDIR /workspace
 ENTRYPOINT ["init-docker.sh"]
-CMD ["pilot"]
