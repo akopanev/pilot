@@ -29,9 +29,10 @@ ENV GIT_CONFIG_COUNT=1
 ENV GIT_CONFIG_KEY_0=safe.directory
 ENV GIT_CONFIG_VALUE_0=/workspace
 
-# Init script + loop script
+# Init script + loop script + engines
 COPY --chmod=755 scripts/init-docker.sh /usr/local/bin/init-docker.sh
 COPY --chmod=755 pilot.sh /usr/local/bin/pilot
+COPY --chmod=755 engines/ /usr/local/bin/engines/
 
 WORKDIR /workspace
 ENTRYPOINT ["init-docker.sh"]

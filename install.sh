@@ -6,7 +6,7 @@ INSTALL_DIR="${PILOT_INSTALL_DIR:-.pilot}"
 
 echo "installing pilot to $INSTALL_DIR..."
 
-mkdir -p "$INSTALL_DIR/scripts" "$INSTALL_DIR/prompts"
+mkdir -p "$INSTALL_DIR/scripts" "$INSTALL_DIR/prompts" "$INSTALL_DIR/engines"
 
 curl -fsSL "$REPO/pilot.sh" -o "$INSTALL_DIR/pilot.sh"
 curl -fsSL "$REPO/Dockerfile" -o "$INSTALL_DIR/Dockerfile"
@@ -14,7 +14,10 @@ curl -fsSL "$REPO/.dockerignore" -o "$INSTALL_DIR/.dockerignore"
 curl -fsSL "$REPO/scripts/init-docker.sh" -o "$INSTALL_DIR/scripts/init-docker.sh"
 curl -fsSL "$REPO/scripts/pilot-docker.py" -o "$INSTALL_DIR/scripts/pilot-docker.py"
 curl -fsSL "$REPO/prompts/gsd.md" -o "$INSTALL_DIR/prompts/gsd.md"
-chmod +x "$INSTALL_DIR/pilot.sh" "$INSTALL_DIR/scripts/"*
+curl -fsSL "$REPO/prompts/signals.md" -o "$INSTALL_DIR/prompts/signals.md"
+curl -fsSL "$REPO/engines/claude-code.sh" -o "$INSTALL_DIR/engines/claude-code.sh"
+curl -fsSL "$REPO/engines/codex.sh" -o "$INSTALL_DIR/engines/codex.sh"
+chmod +x "$INSTALL_DIR/pilot.sh" "$INSTALL_DIR/scripts/"* "$INSTALL_DIR/engines/"*
 
 echo "done."
 echo ""

@@ -4,7 +4,7 @@ Fresh-context orchestrator for AI-driven development.
 
 Runs any methodology (GSD, BMAD, Ralph, custom) in a loop — each round gets a clean context window. The methodology manages its own state via files on disk. Pilot just keeps the loop going.
 
-**The value:** Your methodology defines *what* to build. Pilot handles *how* to execute it — fresh context per round, signal-based flow control, multi-prompt composition. Model/executor switching is WIP.
+**The value:** Your methodology defines *what* to build. Pilot handles *how* to execute it — fresh context per round, signal-based flow control, multi-prompt composition. Engines are pluggable — bring your own.
 
 ## Install
 
@@ -18,19 +18,22 @@ Creates `.pilot/` in your project.
 
 ```bash
 # GSD methodology (included)
-.pilot/pilot.sh -m opus -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
+.pilot/pilot.sh -m opus -p .pilot/prompts/signals.md -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
 
-# stack prompts: methodology + context + instructions
-.pilot/pilot.sh -m opus -p .pilot/prompts/gsd.md -p BRIEF.md -p "skip research phase" -e claude-code -n 20
+# stack prompts: signals + methodology + context + instructions
+.pilot/pilot.sh -m opus -p .pilot/prompts/signals.md -p .pilot/prompts/gsd.md -p BRIEF.md -p "skip research phase" -e claude-code -n 20
 
 # any methodology — just point at your prompt
-.pilot/pilot.sh -m opus -p my-workflow.md -e claude-code -n 10
+.pilot/pilot.sh -m opus -p .pilot/prompts/signals.md -p my-workflow.md -e claude-code -n 10
 
 # codex + o3
-.pilot/pilot.sh -m o3 -p PROMPT.md -e codex -n 10
+.pilot/pilot.sh -m o3 -p .pilot/prompts/signals.md -p PROMPT.md -e codex -n 10
+
+# custom engine
+.pilot/pilot.sh -m opus -p .pilot/prompts/signals.md -p PROMPT.md -e ./my-engine.sh -n 10
 
 # verbose — stream agent output live
-.pilot/pilot.sh -m opus -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20 -v
+.pilot/pilot.sh -m opus -p .pilot/prompts/signals.md -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20 -v
 ```
 
 ## How it works
@@ -38,7 +41,7 @@ Creates `.pilot/` in your project.
 ```
 while true:
     read prompts (files + inline text, concatenated)
-    run executor with prompt + loop signals
+    run engine with prompt
     if <loop:update> → print progress in real-time
     if <loop:done> → exit
     if <loop:failed> → stop with error
@@ -52,33 +55,58 @@ Each round is a fresh process. The agent reads state from disk, does one step, u
 Pilot is methodology-agnostic. Pass one or more `-p` flags — they get concatenated:
 
 ```bash
-.pilot/pilot.sh -m opus -p methodology.md -p project-brief.md -p extra-context.md -e claude-code -n 20
+.pilot/pilot.sh -m opus -p signals.md -p methodology.md -p project-brief.md -e claude-code -n 20
 ```
 
 Files are re-read each round, so you can edit mid-loop.
 
 **Included:**
+- `prompts/signals.md` — loop signal protocol (update, done, failed, human)
 - `prompts/gsd.md` — [GSD (Get Shit Done)](https://github.com/pashpashpash/get-shit-done) loop adapter
 
 **Works with any methodology** that manages state via files: BMAD, Ralph, Compound Engineering, or your own.
 
 ## Signals
 
-Appended to every prompt automatically. The agent emits:
+Defined in `prompts/signals.md` — include it in your prompt stack. The agent emits:
 
 - `<loop:update>status</loop:update>` — progress, printed in real-time
 - `<loop:done>summary</loop:done>` — all work complete, loop exits (exit 0)
 - `<loop:failed>reason</loop:failed>` — stuck or blocked, loop stops (exit 1)
 - `<loop:human>question</loop:human>` — needs human input, logged to `.pilot/human.md`
 
+Pilot parses these from the output regardless of engine. The signal *instructions* (what the AI should emit) live in the prompt. The signal *handling* (what pilot does when it sees them) lives in the loop.
+
+## Engines
+
+Engines are pluggable scripts. Pilot ships with `claude-code` and `codex`, but you can write your own.
+
+**Interface:**
+```
+engine.sh <prompt-file> <model> <logfile>
+```
+
+**Environment:**
+- `VERBOSE` — `0` or `1`
+- `PILOT_DOCKER` — `1` if running in Docker (optional)
+
+**Contract:**
+1. Read the prompt from `<prompt-file>`
+2. Run the AI model
+3. Write full output to `<logfile>`
+4. If `VERBOSE=1`, also stream output to stdout
+5. Return the exit code from the AI tool
+
+**Resolution:** `-e claude-code` looks for `engines/claude-code.sh` next to `pilot.sh`. `-e ./my-engine.sh` uses the path directly.
+
 ## Options
 
 ```
-pilot.sh -m <model> -p <prompt> [-p ...] -e <executor> -n <max-rounds> [-v]
+pilot.sh -m <model> -p <prompt> [-p ...] -e <engine> -n <max-rounds> [-v]
 
 -m, --model <name>        model to use (e.g. opus, o3)
 -p, --prompt <file|text>  prompt file or inline text (repeatable)
--e, --executor <tool>     claude-code, codex
+-e, --engine <name|path>  engine: claude-code, codex, or path to custom script
 -n, --max-rounds <n>      max loop iterations (0 = unlimited)
 -v, --verbose             stream agent output live
 --human-block             stop loop on <loop:human> signals (default: defer)
@@ -98,10 +126,10 @@ All parameters except `-v` and `--human-block` are required.
 
 ```bash
 # first run (builds image)
-.pilot/scripts/pilot-docker.py --build -m opus -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
+.pilot/scripts/pilot-docker.py --build -m opus -p .pilot/prompts/signals.md -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
 
 # subsequent runs
-.pilot/scripts/pilot-docker.py -m opus -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
+.pilot/scripts/pilot-docker.py -m opus -p .pilot/prompts/signals.md -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
 ```
 
 Handles macOS Keychain extraction, credential forwarding, workspace mounting. See [Docker details](#docker-details) below.
@@ -110,6 +138,9 @@ Handles macOS Keychain extraction, credential forwarding, workspace mounting. Se
 
 ```
 pilot.sh                    # the loop
+engines/claude-code.sh      # claude code engine
+engines/codex.sh            # openai codex engine
+prompts/signals.md          # loop signal protocol
 prompts/gsd.md              # GSD methodology adapter
 scripts/pilot-docker.py     # docker launcher
 scripts/init-docker.sh      # container credential setup

@@ -2,8 +2,10 @@
 # pilot — fresh context loop for AI-driven development
 set -uo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # ── defaults ──────────────────────────────────────────────────────────
-EXECUTOR=""
+ENGINE=""
 MODEL=""
 PROMPTS=()
 MAX=""
@@ -17,24 +19,28 @@ while [ $# -gt 0 ]; do
       echo "usage: pilot.sh -m <model> -p <prompt> [-p <prompt>...] [options]"
       echo ""
       echo "required:"
-      echo "  -m, --model <name>       model to use (e.g. opus, o3)"
+      echo "  -m, --model <name>        model to use (e.g. opus, o3)"
       echo "  -p, --prompt <file|text>  prompt file or inline text (repeatable)"
+      echo "  -e, --engine <name|path>  engine script (e.g. claude-code, codex, ./my-engine.sh)"
+      echo "  -n, --max-rounds <n>      max loop iterations (0 = unlimited)"
       echo ""
       echo "options:"
-      echo "  -e, --executor <tool>    claude-code, codex"
-      echo "  -n, --max-rounds <n>     max loop iterations (0 = unlimited)"
       echo "  -v, --verbose            stream agent output live"
       echo "  --human-block            stop loop on <loop:human> signals"
       echo ""
+      echo "engines:"
+      echo "  built-in: claude-code, codex"
+      echo "  custom:   any executable — receives <prompt-file> <model> <logfile>"
+      echo ""
       echo "examples:"
-      echo "  pilot.sh -m opus -p gsd.md -p BRIEF.md -e claude-code -n 20"
-      echo "  pilot.sh -m opus -p gsd.md -p BRIEF.md -p \"skip research\""
+      echo "  pilot.sh -m opus -p prompts/signals.md -p prompts/gsd.md -p BRIEF.md -e claude-code -n 20"
       echo "  pilot.sh -m o3 -p PROMPT.md -e codex -n 10"
+      echo "  pilot.sh -m opus -p PROMPT.md -e ./my-engine.sh -n 10"
       exit 0
       ;;
     -m|--model) MODEL="$2"; shift 2 ;;
     -p|--prompt) PROMPTS+=("$2"); shift 2 ;;
-    -e|--executor) EXECUTOR="$2"; shift 2 ;;
+    -e|--engine) ENGINE="$2"; shift 2 ;;
     -n|--max-rounds) MAX="$2"; shift 2 ;;
     -v|--verbose) VERBOSE=1; shift ;;
     --human-block) HUMAN_BLOCK=1; shift ;;
@@ -50,27 +56,29 @@ done
 MISSING=()
 [ -z "$MODEL" ] && MISSING+=("--model (-m)")
 [ ${#PROMPTS[@]} -eq 0 ] && MISSING+=("--prompt (-p)")
-[ -z "$EXECUTOR" ] && MISSING+=("--executor (-e)")
+[ -z "$ENGINE" ] && MISSING+=("--engine (-e)")
 [ -z "$MAX" ] && MISSING+=("--max-rounds (-n)")
 
 if [ ${#MISSING[@]} -gt 0 ]; then
   echo "error: missing required params: ${MISSING[*]}"
   echo ""
-  echo "usage: pilot.sh -m <model> -p <prompt> -e <executor> -n <max-rounds>"
+  echo "usage: pilot.sh -m <model> -p <prompt> -e <engine> -n <max-rounds>"
   echo ""
-  echo "  pilot.sh -m opus -p gsd.md -p BRIEF.md -e claude-code -n 20"
+  echo "  pilot.sh -m opus -p prompts/signals.md -p prompts/gsd.md -p BRIEF.md -e claude-code -n 20"
   echo "  pilot.sh --help"
   exit 1
 fi
 
-case "$EXECUTOR" in
-  claude-code|codex) ;;
-  *)
-    echo "error: unknown executor '$EXECUTOR'"
-    echo "supported: claude-code, codex"
-    exit 1
-    ;;
-esac
+# ── resolve engine ────────────────────────────────────────────────────
+if [ -x "$ENGINE" ]; then
+  ENGINE_PATH="$ENGINE"
+elif [ -x "$SCRIPT_DIR/engines/${ENGINE}.sh" ]; then
+  ENGINE_PATH="$SCRIPT_DIR/engines/${ENGINE}.sh"
+else
+  echo "error: engine '$ENGINE' not found"
+  echo "looked in: $ENGINE, $SCRIPT_DIR/engines/${ENGINE}.sh"
+  exit 1
+fi
 
 # ── prompt display ────────────────────────────────────────────────────
 PROMPT_DISPLAY=""
@@ -82,41 +90,6 @@ for p in "${PROMPTS[@]}"; do
     PROMPT_DISPLAY="${PROMPT_DISPLAY:+$PROMPT_DISPLAY + }\"$SHORT\""
   fi
 done
-
-# ── signals appended to every prompt ──────────────────────────────────
-SIGNALS='
-
----
-# Loop Signals
-
-You are running inside a loop. Each round is a fresh context — you have NO memory of previous rounds. All state must be read from files on disk.
-
-Emit these XML signals during your work:
-
-- <loop:update>short status update</loop:update>
-  Emit freely as you hit milestones — starting a task, completed something, passed tests, found an issue, made a decision.
-
-- <loop:done>summary of completed work</loop:done>
-  ONLY when the ENTIRE project is fully complete — all phases, all tasks, everything delivered. The loop will exit permanently. Do NOT emit this after completing a single step, phase, or sub-task. If there is more work remaining in your methodology, do NOT emit this.
-
-- <loop:failed>reason</loop:failed>
-  When you are stuck, blocked, or cannot proceed. The loop will stop.
-
-- <loop:human>question or action needed</loop:human>
-  When you need human input — credentials, decisions, approvals, manual steps. Describe what you need clearly. The question will be logged and the human will answer. Previous Q&A history (if any) is included in your prompt.
-
-Rules:
-- Emit <loop:update> on meaningful progress so the operator can follow along
-- <loop:done> means the ENTIRE project is finished — not just this step or phase. If your methodology has more steps, do NOT emit done.
-- <loop:failed> means you cannot continue — unrecoverable error, missing dependency, conflicting requirements
-- <loop:human> means you need human input — the loop may continue or pause depending on configuration
-- If you do not emit <loop:done> or <loop:failed>, the loop continues automatically
-- When in doubt, do NOT emit <loop:done>. Just finish your step and exit — the loop will bring you back.
-
-# Scope
-
-Do ONE step only. Read your state, figure out what the single next step is in your methodology, execute it, and stop. Do not try to do everything in one round — you will be restarted with fresh context for the next step. One step, done well, then exit.
-'
 
 # ── portable signal extraction (no grep -P, works on macOS) ──────────
 extract_signals() {
@@ -143,78 +116,7 @@ build_prompt() {
     result="${result}$(cat "$HUMAN_FILE")"$'\n\n'
   fi
 
-  result="${result}${SIGNALS}"
   echo "$result"
-}
-
-# ── jq filter for extracting text from claude stream-json ─────────────
-# handles all 4 event types: assistant, content_block_delta, message_stop, result
-JQ_STREAM='
-  if .type == "content_block_delta" and .delta?.type == "text_delta" then
-    .delta.text // empty
-  elif .type == "assistant" then
-    ([.message?.content[]? | select(.type == "text") | .text] | join(""))
-  elif .type == "message_stop" then
-    ([.message?.content[]? | select(.type == "text") | .text] | join(""))
-  elif .type == "result" and (.result?.output | type) == "object" then
-    ([.result.output.content[]? | select(.type == "text") | .text] | join(""))
-  else empty end
-'
-
-# ── executor functions ────────────────────────────────────────────────
-
-run_claude() {
-  local prompt="$1" model="$2" logfile="$3"
-
-  # always use stream-json for proper event parsing
-  if [ "$VERBOSE" = "1" ]; then
-    echo "  ┄┄┄"
-    claude -p --dangerously-skip-permissions \
-      --model "$model" --verbose \
-      --output-format stream-json \
-      "$prompt" 2>&1 | \
-      jq --unbuffered -r "$JQ_STREAM" 2>/dev/null | \
-      tee -a "$logfile" | cat -s
-    echo "  ┄┄┄"
-  else
-    claude -p --dangerously-skip-permissions \
-      --model "$model" --verbose \
-      --output-format stream-json \
-      "$prompt" 2>&1 | \
-      jq --unbuffered -r "$JQ_STREAM" 2>/dev/null | \
-      tee -a "$logfile" | \
-      sed -nu 's/.*<loop:update>\(.*\)<\/loop:update>.*/  ▸ \1/p'
-  fi
-
-  # clean up blank lines in log
-  grep '.' "$logfile" > "$logfile.tmp" 2>/dev/null && mv "$logfile.tmp" "$logfile" || true
-}
-
-run_codex() {
-  local prompt="$1" model="$2" logfile="$3"
-
-  # codex needs prompt as positional arg, not via -p
-  # Docker: full access; bare metal: full-auto sandbox
-  local sandbox="full-auto"
-  [ "${PILOT_DOCKER:-}" = "1" ] && sandbox="danger-full-access"
-
-  if [ "$VERBOSE" = "1" ]; then
-    codex exec \
-      --sandbox "$sandbox" \
-      --skip-git-repo-check \
-      -c model="$model" \
-      -c model_reasoning_effort=xhigh \
-      -c stream_idle_timeout_ms=3600000 \
-      "$prompt" 2>&1 | tee "$logfile"
-  else
-    codex exec \
-      --sandbox "$sandbox" \
-      --skip-git-repo-check \
-      -c model="$model" \
-      -c model_reasoning_effort=xhigh \
-      -c stream_idle_timeout_ms=3600000 \
-      "$prompt" > "$logfile" 2>&1
-  fi
 }
 
 # ── session logs ─────────────────────────────────────────────────────
@@ -225,7 +127,7 @@ mkdir -p "$LOG_DIR"
 # ── banner ────────────────────────────────────────────────────────────
 echo ""
 echo "  pilot"
-echo "  executor: $EXECUTOR"
+echo "  engine:   $(basename "$ENGINE_PATH" .sh)"
 echo "  model:    $MODEL"
 echo "  prompt:   $PROMPT_DISPLAY"
 echo "  max:      $([ "$MAX" -gt 0 ] 2>/dev/null && echo "$MAX" || echo "unlimited")"
@@ -233,9 +135,15 @@ echo "  human:    $([ "$HUMAN_BLOCK" = "1" ] && echo "block" || echo "defer")"
 echo "  logs:     $LOG_DIR/"
 echo ""
 
+# ── export env for engines ───────────────────────────────────────────
+export VERBOSE
+
 # ── main loop ─────────────────────────────────────────────────────────
 ROUND=0
 FAILURES=0
+PROMPT_FILE=$(mktemp)
+trap 'rm -f "$PROMPT_FILE"' EXIT
+
 while true; do
   ROUND=$((ROUND + 1))
   [ "$MAX" -gt 0 ] 2>/dev/null && [ "$ROUND" -gt "$MAX" ] && echo "max rounds ($MAX) reached." && break
@@ -244,21 +152,17 @@ while true; do
   START=$(date +%s)
 
   # build prompt fresh each round (re-reads files, allows mid-loop edits)
-  FULL_PROMPT=$(build_prompt)
+  build_prompt > "$PROMPT_FILE"
 
-  # log file created before executor — tail -f to watch live
+  # log file created before engine — tail -f to watch live
   LOG_FILE=$(printf "%s/round-%03d.log" "$LOG_DIR" "$ROUND")
   > "$LOG_FILE"
 
-  # dispatch to executor (streams to log file in real-time)
-  case "$EXECUTOR" in
-    claude-code) run_claude "$FULL_PROMPT" "$MODEL" "$LOG_FILE" ;;
-    codex)       run_codex  "$FULL_PROMPT" "$MODEL" "$LOG_FILE" ;;
-  esac
-
+  # dispatch to engine
+  "$ENGINE_PATH" "$PROMPT_FILE" "$MODEL" "$LOG_FILE"
   EXIT_CODE=$?
-  OUTPUT=$(cat "$LOG_FILE")
 
+  OUTPUT=$(cat "$LOG_FILE")
   ELAPSED=$(( $(date +%s) - START ))
 
   # ── handle agent failures ───────────────────────────────────────────
