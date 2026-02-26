@@ -1,159 +1,228 @@
-# pilot
+# PILOT
 
-Fresh-context orchestrator for AI-driven development.
-
-Runs any methodology (GSD, BMAD, Ralph, custom) in a loop — each round gets a clean context window. The methodology manages its own state via files on disk. Pilot just keeps the loop going.
-
-**The value:** Your methodology defines *what* to build. Pilot handles *how* to execute it — fresh context per round, signal-based flow control, multi-prompt composition. Engines are pluggable — bring your own.
+Config-driven pipeline engine for AI agents. Define stages, transitions, and runners in YAML — the engine handles the state machine.
 
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/akopanev/pilot/master/install.sh | bash
+# One-line install (from private repo)
+curl -sSL https://raw.githubusercontent.com/akopanev/pilot/main/install.sh | bash
+
+# Or from a local checkout
+PILOT_REPO=/path/to/pilot bash install.sh
 ```
 
-Creates `.pilot/` in your project.
+Requires Python 3.11+. Installs to `~/.pilot-engine/` with wrappers at `~/.local/bin/pilot` and `~/.local/bin/pilot-docker`.
 
-## Quick start
+## Quick Start
 
 ```bash
-# GSD methodology (included)
-.pilot/pilot.sh -m opus -p .pilot/prompts/signals.md -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
+# Scaffold .pilot/ in your project
+cd your-project
+pilot init
 
-# stack prompts: signals + methodology + context + instructions
-.pilot/pilot.sh -m opus -p .pilot/prompts/signals.md -p .pilot/prompts/gsd.md -p BRIEF.md -p "skip research phase" -e claude-code -n 20
+# Preview the pipeline
+pilot run .pilot/pipeline.yaml --dry-run
 
-# any methodology — just point at your prompt
-.pilot/pilot.sh -m opus -p .pilot/prompts/signals.md -p my-workflow.md -e claude-code -n 10
-
-# codex + o3
-.pilot/pilot.sh -m o3 -p .pilot/prompts/signals.md -p PROMPT.md -e codex -n 10
-
-# custom engine
-.pilot/pilot.sh -m opus -p .pilot/prompts/signals.md -p PROMPT.md -e ./my-engine.sh -n 10
-
-# verbose — stream agent output live
-.pilot/pilot.sh -m opus -p .pilot/prompts/signals.md -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20 -v
+# Run the pipeline
+pilot run .pilot/pipeline.yaml
 ```
 
-## How it works
+`pilot init` creates:
 
 ```
-while true:
-    read prompts (files + inline text, concatenated)
-    run engine with prompt
-    if <loop:update> → print progress in real-time
-    if <loop:done> → exit
-    if <loop:failed> → stop with error
-    next round (fresh context)
+.pilot/
+├── pipeline.yaml           # pipeline config
+├── prompts/                # prompt templates
+│   ├── implement.md
+│   ├── review.md
+│   └── fix.md
+└── scripts/                # shell stages
+    ├── pick.sh
+    └── merge.sh
 ```
 
-Each round is a fresh process. The agent reads state from disk, does one step, updates state, exits. Pilot restarts it for the next step. The methodology controls the flow — pilot is just the loop.
-
-## Prompts
-
-Pilot is methodology-agnostic. Pass one or more `-p` flags — they get concatenated:
-
-```bash
-.pilot/pilot.sh -m opus -p signals.md -p methodology.md -p project-brief.md -e claude-code -n 20
-```
-
-Files are re-read each round, so you can edit mid-loop.
-
-**Included:**
-- `prompts/signals.md` — loop signal protocol (update, done, failed, human)
-- `prompts/gsd.md` — [GSD (Get Shit Done)](https://github.com/pashpashpash/get-shit-done) loop adapter
-
-**Works with any methodology** that manages state via files: BMAD, Ralph, Compound Engineering, or your own.
-
-## Signals
-
-Defined in `prompts/signals.md` — include it in your prompt stack. The agent emits:
-
-- `<loop:update>status</loop:update>` — progress, printed in real-time
-- `<loop:done>summary</loop:done>` — all work complete, loop exits (exit 0)
-- `<loop:failed>reason</loop:failed>` — stuck or blocked, loop stops (exit 1)
-- `<loop:human>question</loop:human>` — needs human input, logged to `.pilot/human.md`
-
-Pilot parses these from the output regardless of engine. The signal *instructions* (what the AI should emit) live in the prompt. The signal *handling* (what pilot does when it sees them) lives in the loop.
-
-## Engines
-
-Engines are pluggable scripts. Pilot ships with `claude-code` and `codex`, but you can write your own.
-
-**Interface:**
-```
-engine.sh <prompt-file> <model> <logfile>
-```
-
-**Environment:**
-- `VERBOSE` — `0` or `1`
-- `PILOT_DOCKER` — `1` if running in Docker (optional)
-
-**Contract:**
-1. Read the prompt from `<prompt-file>`
-2. Run the AI model
-3. Write full output to `<logfile>`
-4. If `VERBOSE=1`, also stream output to stdout
-5. Return the exit code from the AI tool
-
-**Resolution:** `-e claude-code` looks for `engines/claude-code.sh` next to `pilot.sh`. `-e ./my-engine.sh` uses the path directly.
-
-## Options
+Runtime state (gitignored):
 
 ```
-pilot.sh -m <model> -p <prompt> [-p ...] -e <engine> -n <max-rounds> [-v]
-
--m, --model <name>        model to use (e.g. opus, o3)
--p, --prompt <file|text>  prompt file or inline text (repeatable)
--e, --engine <name|path>  engine: claude-code, codex, or path to custom script
--n, --max-rounds <n>      max loop iterations (0 = unlimited)
--v, --verbose             stream agent output live
---human-block             stop loop on <loop:human> signals (default: defer)
+.pilot/
+├── state                   # current stage + round (crash recovery)
+└── vars                    # persistent key-value pairs
 ```
-
-All parameters except `-v` and `--human-block` are required.
-
-**Human-in-the-loop:** When the agent needs human input (credentials, decisions, approvals), it emits `<loop:human>`. The question is always logged to `.pilot/human.md`. By default the loop continues (defer) — questions accumulate and you batch-answer later. With `--human-block`, the loop stops and waits for you to answer in `human.md` before re-running.
-
-## Safety
-
-- **Max rounds** enforced via `-n`
-- **3 consecutive failures** → auto-stop
-- **Short round detection** — warns if round < 5 seconds
 
 ## Docker
 
+Run in a hermetic container with all tools pre-installed (claude-code, codex).
+
 ```bash
-# first run (builds image)
-.pilot/scripts/pilot-docker.py --build -m opus -p .pilot/prompts/signals.md -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
+# Run from any project directory — image auto-builds on first use
+cd ~/my-project
+pilot-docker run .pilot/pipeline.yaml --dry-run
+pilot-docker run .pilot/pipeline.yaml
 
-# subsequent runs
-.pilot/scripts/pilot-docker.py -m opus -p .pilot/prompts/signals.md -p .pilot/prompts/gsd.md -p BRIEF.md -e claude-code -n 20
+# Force rebuild after pilot source changes
+pilot-docker --build run .pilot/pipeline.yaml
+
+# With API keys instead of CLI auth
+ANTHROPIC_API_KEY=sk-... pilot-docker run .pilot/pipeline.yaml
 ```
 
-Handles macOS Keychain extraction, credential forwarding, workspace mounting. See [Docker details](#docker-details) below.
+The `pilot-docker` wrapper:
+- Auto-builds the image on first use
+- Mounts `$(pwd)` as `/workspace`
+- Extracts Claude credentials from macOS Keychain
+- Forwards codex/git config read-only
+- Matches host UID for correct file ownership
 
-## Files
+---
+
+## How It Works
+
+PILOT is a state machine. Each **stage** runs an executor (shell script or AI agent), parses **signals** from the output, and transitions to the next stage based on the config.
 
 ```
-pilot.sh                    # the loop
-engines/claude-code.sh      # claude code engine
-engines/codex.sh            # openai codex engine
-prompts/signals.md          # loop signal protocol
-prompts/gsd.md              # GSD methodology adapter
-scripts/pilot-docker.py     # docker launcher
-scripts/init-docker.sh      # container credential setup
-Dockerfile                  # node:22 + claude-code + codex + gh + python3
+pick ──ready──> implement ──> review ──approved──> merge ──> pick
+                                 │
+                              rejected
+                                 │
+                                fix ──────> review
 ```
 
-## Docker details
+The agent doesn't decide routing — the config does.
 
-- macOS Keychain extraction for subscription-based Claude auth
-- Selective credential copy (skips multi-GB cache)
-- Codex config (`~/.codex/`) forwarded
-- `$(pwd)` mounted as `/workspace` (read-write)
-- `.gitconfig` forwarded
-- `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` pass-through
-- Non-root user with matching UID
-- Codex sandbox: `danger-full-access` in Docker (`PILOT_DOCKER=1`)
+## Pipeline Config
+
+```yaml
+version: "0.1"
+
+vars:                         # exported as env vars every round
+  PILOT_DEFAULT_BRANCH: master
+
+stages:
+  pick:
+    runner:
+      executor: shell         # shell stages use command:
+      command: |
+        {{file:scripts/pick.sh}}
+    on_signal:
+      ready: implement        # signal → next stage
+      completed: __exit__     # stop pipeline
+      default: pick           # no signal → retry
+
+  implement:
+    prompt: |                 # AI stages use prompt:
+      {{file:prompts/implement.md}}
+    runner:
+      executor: codex
+      model: o3
+    fallback_runner:          # fallback if primary fails (2 retries each)
+      executor: claude-code
+      model: sonnet
+    on_signal:
+      default: review
+```
+
+### Stages
+
+Named steps. First stage in YAML is the entry point.
+
+### Runners
+
+Executors that run each stage:
+
+| Executor | Mode | Description |
+|----------|------|-------------|
+| `shell` | command | Run shell scripts/commands |
+| `claude-code` | AI | Claude Code (JSON stream, `--dangerously-skip-permissions`) |
+| `codex` | AI | OpenAI Codex CLI (`--sandbox full-auto`) |
+| `opencode` | AI | OpenCode (`--dangerously-skip-permissions`) |
+| anything else | AI | Generic CLI tool (`<tool> --model M -p PROMPT`) |
+
+### Signals
+
+Structured output from agents/scripts — XML tags in stdout:
+
+```xml
+<signal:ready>tk-5c46</signal:ready>
+<signal:approved>all checks pass</signal:approved>
+<signal:var key=PILOT_TASK_ID>tk-5c46</signal:var>
+<signal:update>running tests...</signal:update>
+<signal:failed>build error</signal:failed>
+```
+
+Built-in signals:
+- `update` — progress display (doesn't affect routing)
+- `failed` — stop pipeline with error
+- `var` — persist key-value pair to `.pilot/vars`
+
+Domain signals (`ready`, `approved`, `rejected`, etc.) are config-defined per stage.
+
+### Transitions
+
+Signal-to-stage mapping in `on_signal:`:
+- `ready: implement` — go to implement on `ready` signal
+- `completed: __exit__` — stop the pipeline
+- `default: pick` — fallback when no domain signal is emitted
+
+### Templates
+
+Resolved in prompts and commands before execution:
+- `{{file:path}}` — inline file contents (relative to config dir, recursive)
+- `{{var:NAME}}` — inline var value from `.pilot/vars`
+
+### Retry & Fallback
+
+Engine behavior (not in config): primary runner retries twice, then fallback runner retries twice. If all 4 attempts fail, the round fails. Three consecutive round failures stop the pipeline.
+
+## Persistence
+
+**State** (`.pilot/state`) — current stage and round number. Survives crashes — the engine resumes where it left off. Cleaned on `__exit__`.
+
+**Vars** (`.pilot/vars`) — persistent key-value pairs exported as env vars every round:
+
+```
+PILOT_DEFAULT_BRANCH=master
+PILOT_TASK_ID=tk-5c46
+```
+
+Three sources:
+1. `vars:` in pipeline.yaml — written every round
+2. `<signal:var key=NAME>value</signal:var>` — emitted by agents/scripts
+3. Direct file edit — scripts can write to `.pilot/vars` directly
+
+All cleaned on `__exit__`.
+
+## Commands
+
+```
+pilot run <pipeline.yaml>              Run the pipeline
+pilot run <pipeline.yaml> --dry-run    Show stages without executing
+pilot validate <pipeline.yaml>         Validate config
+pilot init                             Scaffold .pilot/ with default dev pipeline
+```
+
+## Project Structure
+
+```
+src/pilot/
+  cli.py            CLI entry point
+  config.py         YAML loading + validation
+  models.py         Stage, Runner, Transition, PipelineConfig
+  engine.py         State machine loop (retry, fallback, signals)
+  signals.py        <signal:NAME> parser (XML with attrs)
+  templates.py      {{file:path}} and {{var:NAME}} resolution
+  state.py          .pilot/state read/write
+  vars.py           .pilot/vars read/write/export
+  display.py        Terminal output (rich)
+  executors/
+    shell.py        Shell command executor
+    claude.py       Claude Code (JSON stream)
+    codex.py        Codex CLI
+    opencode.py     OpenCode (dangerous mode)
+    generic.py      Generic CLI tool
+  defaults/
+    develop/        Shipped dev pipeline template
+scripts/
+  pilot-docker      Docker wrapper with credential forwarding
+  init-docker.sh    Container entrypoint (credential copy)
+```

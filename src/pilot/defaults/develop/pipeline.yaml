@@ -1,0 +1,67 @@
+# Development pipeline — pick -> implement -> review -> fix cycle
+# Stages run top-to-bottom; first stage is the entry point.
+version: "0.1"
+
+# Exported as env vars every round (key = var name)
+vars:
+  PILOT_DEFAULT_BRANCH: master
+
+stages:
+
+  # Pick next task from tracker, create feature branch
+  pick:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/pick.sh}}
+    on_signal:
+      ready: implement      # task picked — go implement
+      completed: __exit__   # no tasks left — stop pipeline
+      default: pick         # retry
+
+  # Implement the task (codex primary, claude fallback)
+  implement:
+    prompt: |
+      {{file:prompts/implement.md}}
+    runner:
+      executor: codex
+      model: gpt-codex-5.3
+    fallback_runner:
+      executor: claude-code
+      model: sonnet
+    on_signal:
+      default: review       # always goes to review
+
+  # Code review — approve or reject
+  review:
+    prompt: |
+      {{file:prompts/review.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      approved: merge       # pass — squash merge
+      rejected: fix         # fail — send back for fixes
+      default: review       # no signal — retry review
+
+  # Squash merge feature branch, close task, clean up
+  merge:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/merge.sh}}
+    on_signal:
+      default: pick         # back to picking next task
+
+  # Address review feedback
+  fix:
+    prompt: |
+      {{file:prompts/fix.md}}
+    runner:
+      executor: codex
+      model: o3
+    fallback_runner:
+      executor: claude-code
+      model: sonnet
+    on_signal:
+      default: review       # always back to review

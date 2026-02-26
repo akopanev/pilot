@@ -1,38 +1,36 @@
-FROM node:22-bookworm
+FROM python:3.12-slim
 
-# System tools
+# System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git ripgrep bash curl ca-certificates jq python3 python3-pip \
+    git nodejs npm ripgrep bash curl ca-certificates jq \
     && rm -rf /var/lib/apt/lists/*
 
-# GitHub CLI
-RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-      -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-      > /etc/apt/sources.list.d/github-cli.list \
-    && apt-get update && apt-get install -y gh && rm -rf /var/lib/apt/lists/*
+# Install CLI tools
+RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
+    && command -v claude >/dev/null \
+    && command -v codex >/dev/null
 
-# AI tools
-RUN npm install -g @anthropic-ai/claude-code @openai/codex
+# Install Pilot
+COPY . /opt/pilot
+RUN pip install --no-cache-dir /opt/pilot && rm -rf /opt/pilot
 
-# Non-root user with configurable UID
+# Init script (credential copy from read-only mounts)
+COPY scripts/init-docker.sh /usr/local/bin/init-docker.sh
+RUN chmod +x /usr/local/bin/init-docker.sh
+
+# Non-root user
 ARG USER_UID=1000
 RUN useradd -m -u ${USER_UID} -s /bin/bash pilot
 USER pilot
 
-# Docker environment marker (codex uses danger-full-access sandbox)
+# Docker marker
 ENV PILOT_DOCKER=1
 
-# Git safe.directory — workspace is host-mounted, ownership won't match container user.
-# ENV is baked into the image; no .gitconfig write needed.
+# Git safe.directory for host-mounted workspace
 ENV GIT_CONFIG_COUNT=1
 ENV GIT_CONFIG_KEY_0=safe.directory
 ENV GIT_CONFIG_VALUE_0=/workspace
 
-# Init script + loop script + engines
-COPY --chmod=755 scripts/init-docker.sh /usr/local/bin/init-docker.sh
-COPY --chmod=755 pilot.sh /usr/local/bin/pilot
-COPY --chmod=755 engines/ /usr/local/bin/engines/
-
 WORKDIR /workspace
-ENTRYPOINT ["init-docker.sh"]
+ENTRYPOINT ["/usr/local/bin/init-docker.sh"]
+CMD ["pilot", "run", ".pilot/pipeline.yaml"]

@@ -1,0 +1,42 @@
+"""Executor pool — routes executor names to implementations."""
+
+from __future__ import annotations
+
+from pilot.executors.claude import ClaudeExecutor
+from pilot.executors.codex import CodexExecutor
+from pilot.executors.generic import GenericExecutor
+from pilot.executors.opencode import OpenCodeExecutor
+from pilot.executors.result import ExecutorResult
+from pilot.executors.shell import ShellExecutor
+
+
+class ExecutorPool:
+    """Cached executor instances. Routes executor name to the right class.
+
+    Routing:
+      - "shell"       -> ShellExecutor    (runs commands, prompt = command)
+      - "claude-code" -> ClaudeExecutor   (JSON stream)
+      - "codex"       -> CodexExecutor    (split stderr/stdout)
+      - "opencode"    -> OpenCodeExecutor (crush/opencode, yolo mode)
+      - anything else -> GenericExecutor  (plain text)
+    """
+
+    def __init__(self):
+        self._pool: dict = {}
+
+    def get(self, executor_name: str):
+        if executor_name not in self._pool:
+            self._pool[executor_name] = self._create(executor_name)
+        return self._pool[executor_name]
+
+    @staticmethod
+    def _create(name: str):
+        if name == "shell":
+            return ShellExecutor()
+        if name == "claude-code":
+            return ClaudeExecutor()
+        if name == "codex":
+            return CodexExecutor()
+        if name == "opencode":
+            return OpenCodeExecutor()
+        return GenericExecutor(tool=name)
