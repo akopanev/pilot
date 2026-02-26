@@ -6,7 +6,7 @@ import os
 import signal
 import subprocess
 
-from pilot.signals import Signal, parse_signals
+from pilot.signals import parse_signals
 from pilot.executors.result import ExecutorResult
 
 

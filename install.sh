@@ -7,7 +7,7 @@ set -euo pipefail
 #   bash install.sh
 #   PILOT_REPO=/path/to/local install.sh
 
-INSTALL_DIR="$HOME/.pilot-engine"
+INSTALL_DIR="$HOME/.pilot"
 VENV_DIR="$INSTALL_DIR/.venv"
 BIN_DIR="$HOME/.local/bin"
 WRAPPER="$BIN_DIR/pilot"
@@ -75,7 +75,7 @@ mkdir -p "$BIN_DIR"
 # pilot — native CLI
 cat > "$WRAPPER" <<'WRAPPER_EOF'
 #!/usr/bin/env bash
-exec "$HOME/.pilot-engine/.venv/bin/python" -m pilot "$@"
+exec "$HOME/.pilot/.venv/bin/python" -m pilot "$@"
 WRAPPER_EOF
 chmod +x "$WRAPPER"
 info "Wrapper installed at $WRAPPER"

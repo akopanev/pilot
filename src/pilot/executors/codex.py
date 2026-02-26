@@ -7,7 +7,7 @@ import signal
 import subprocess
 import threading
 
-from pilot.signals import Signal, parse_signals
+from pilot.signals import parse_signals
 from pilot.executors.result import ExecutorResult
 
 
@@ -55,6 +55,9 @@ class CodexExecutor:
         stdout_error = None
         try:
             stdout_content = proc.stdout.read()
+        except KeyboardInterrupt:
+            _kill_process_group(proc)
+            raise
         except Exception as e:
             stdout_error = str(e)
 
@@ -100,3 +103,16 @@ class CodexExecutor:
             result["error"] = str(e)
 
         result["last_lines"] = tail
+
+
+def _kill_process_group(proc: subprocess.Popen) -> None:
+    """Graceful shutdown: SIGTERM -> wait -> SIGKILL."""
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        proc.wait(timeout=5)
+    except (ProcessLookupError, subprocess.TimeoutExpired):
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()

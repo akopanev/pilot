@@ -17,7 +17,7 @@ class ExecutorPool:
       - "shell"       -> ShellExecutor    (runs commands, prompt = command)
       - "claude-code" -> ClaudeExecutor   (JSON stream)
       - "codex"       -> CodexExecutor    (split stderr/stdout)
-      - "opencode"    -> OpenCodeExecutor (crush/opencode, yolo mode)
+      - "opencode"    -> OpenCodeExecutor (opencode.ai, dangerous mode)
       - anything else -> GenericExecutor  (plain text)
     """
 

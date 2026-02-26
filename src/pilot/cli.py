@@ -42,6 +42,11 @@ def cmd_run(args) -> None:
 
     def _handle_signal(signum, frame):
         cancel_event.set()
+        # Restore default handler so second CTRL+C raises KeyboardInterrupt
+        # and triggers executor cleanup (_kill_process_group)
+        signal.signal(signal.SIGINT, signal.default_int_handler)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        display.warn("Stopping after current round... (press again to force)")
 
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)

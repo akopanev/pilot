@@ -12,7 +12,7 @@ curl -sSL https://raw.githubusercontent.com/akopanev/pilot/main/install.sh | bas
 PILOT_REPO=/path/to/pilot bash install.sh
 ```
 
-Requires Python 3.11+. Installs to `~/.pilot-engine/` with wrappers at `~/.local/bin/pilot` and `~/.local/bin/pilot-docker`.
+Requires Python 3.11+. Installs to `~/.pilot/` with wrappers at `~/.local/bin/pilot` and `~/.local/bin/pilot-docker`.
 
 ## Quick Start
 

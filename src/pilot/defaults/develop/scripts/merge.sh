@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Squash-merge feature branch, close task, clean up.
 # Uses: $PILOT_DEFAULT_BRANCH, $PILOT_TASK_ID (set by engine)
+# Requires: tk (task tracker CLI) — replace with your own tracker command
 
 BRANCH="$PILOT_DEFAULT_BRANCH"
 TASK="$PILOT_TASK_ID"

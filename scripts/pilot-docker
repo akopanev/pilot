@@ -24,9 +24,9 @@ from typing import Optional
 
 DEFAULT_IMAGE = "pilot:latest"
 SCRIPT_DIR = Path(os.path.realpath(__file__)).parent
-# pilot source: scripts/../ (dev) or ~/.pilot-engine/ (installed)
+# pilot source: scripts/../ (dev) or ~/.pilot/ (installed)
 _dev_src = SCRIPT_DIR.parent
-_installed_src = Path.home() / ".pilot-engine"
+_installed_src = Path.home() / ".pilot"
 PILOT_SRC = _dev_src if (_dev_src / "Dockerfile").exists() else _installed_src
 
 

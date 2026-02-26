@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import threading
 
 from pilot.display import Display
@@ -75,8 +73,7 @@ class PipelineEngine:
 
             stage = self.config.stages.get(self.state.stage)
             if not stage:
-                self.display.error(f"Unknown stage: {self.state.stage}")
-                sys.exit(1)
+                raise PipelineError(f"Unknown stage: {self.state.stage}")
 
             self.display.round_header(
                 self.state.round,
@@ -89,8 +86,7 @@ class PipelineEngine:
             try:
                 prompt = self._build_prompt(stage)
             except TemplateError as e:
-                self.display.error(f"Template error: {e}")
-                sys.exit(1)
+                raise PipelineError(f"Template error: {e}") from e
 
             # Known signals for this stage
             known = set(stage.on_signal.keys()) | BUILTIN_SIGNALS
@@ -105,8 +101,7 @@ class PipelineEngine:
                     f"consecutive failures {consecutive_failures}/3"
                 )
                 if consecutive_failures >= 3:
-                    self.display.error("3 consecutive round failures. Stopping.")
-                    sys.exit(1)
+                    raise PipelineError("3 consecutive round failures")
                 self._wait()
                 continue
 
@@ -118,8 +113,7 @@ class PipelineEngine:
             # Built-in: failed
             failed = next((s for s in signals if s.name == "failed"), None)
             if failed:
-                self.display.error(f"Agent failed: {failed.content}")
-                sys.exit(1)
+                raise PipelineError(f"Agent failed: {failed.content}")
 
             # Built-in: var — persist to vars file
             # Format: <signal:var key=NAME>value
@@ -146,8 +140,7 @@ class PipelineEngine:
             elif "default" in stage.on_signal:
                 transition = stage.on_signal["default"]
             else:
-                self.display.error(f"No default in stage '{stage.name}'")
-                sys.exit(1)
+                raise PipelineError(f"No default in stage '{stage.name}'")
 
             # Transition
             if transition.to is None:
