@@ -13,6 +13,7 @@ RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
 # Install ticket (tk) — git-backed issue tracker (full clone for plugins)
 RUN git clone --depth 1 https://github.com/wedow/ticket.git /opt/ticket \
     && ln -s /opt/ticket/ticket /usr/local/bin/tk
+ENV PATH="/opt/ticket/plugins:${PATH}"
 
 # Install Pilot
 COPY . /opt/pilot
