@@ -252,11 +252,16 @@ def run_docker(image: str, volumes: list[str], args: list[str]) -> int:
     try:
         proc.wait()
     except KeyboardInterrupt:
+        # SIGINT already forwarded to container via tty — let pilot handle it
         try:
-            proc.terminate()
-        except ProcessLookupError:
-            pass
-        proc.wait()
+            proc.wait()
+        except KeyboardInterrupt:
+            # Second Ctrl+C: force kill
+            try:
+                proc.terminate()
+            except ProcessLookupError:
+                pass
+            proc.wait()
     finally:
         run_docker._active_proc = None  # type: ignore[attr-defined]
     return proc.returncode

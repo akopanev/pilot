@@ -75,6 +75,7 @@ else
 {"permission":{"*":"allow"}}
 OCEOF
 fi
-chown -R pilot:pilot /home/pilot/.config/opencode /home/pilot/.local/share/opencode 2>/dev/null || true
+# Ensure pilot owns all config/local dirs (opencode needs .local/state/ too)
+chown -R pilot:pilot /home/pilot/.config /home/pilot/.local 2>/dev/null || true
 
 exec gosu pilot "$@"
