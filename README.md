@@ -47,12 +47,13 @@ Runtime state (gitignored):
 ```
 .pilot/
 ├── state                   # current stage (crash recovery)
-└── vars                    # persistent key-value pairs
+├── vars                    # persistent key-value pairs
+└── logs/                   # real-time session logs
 ```
 
 ## Docker
 
-Run in a hermetic container with all tools pre-installed (claude-code, codex).
+Run in a hermetic container with all tools pre-installed (claude-code, codex, opencode).
 
 ```bash
 # Run from any project directory — image auto-builds on first use
@@ -65,14 +66,18 @@ pilot-docker --build run .pilot/pipeline.yaml
 
 # With API keys instead of CLI auth
 ANTHROPIC_API_KEY=sk-... pilot-docker run .pilot/pipeline.yaml
+ZHIPU_API_KEY=... pilot-docker run .pilot/pipeline.yaml
 ```
 
 The `pilot-docker` wrapper:
 - Auto-builds the image on first use
 - Mounts `$(pwd)` as `/workspace`
 - Extracts Claude credentials from macOS Keychain
-- Forwards codex/git config read-only
+- Forwards codex/opencode/git config read-only
+- Forwards API keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ZHIPU_API_KEY`)
+- Sets OpenCode permissions to allow-all (no interactive prompts)
 - Matches host UID for correct file ownership
+- Uses `tini` as init process for proper signal handling (Ctrl+C)
 
 ---
 
@@ -136,14 +141,14 @@ Executors that run each stage:
 | Executor | Mode | Description |
 |----------|------|-------------|
 | `shell` | command | Run shell scripts/commands |
-| `claude-code` | AI | Claude Code (JSON stream, `--dangerously-skip-permissions`) |
+| `claude-code` | AI | Claude Code (`--dangerously-skip-permissions`, JSON stream) |
 | `codex` | AI | OpenAI Codex CLI (`--sandbox full-auto`) |
-| `opencode` | AI | OpenCode (`--dangerously-skip-permissions`) |
+| `opencode` | AI | OpenCode (`-m provider/model`, permissions via config) |
 | anything else | AI | Generic CLI tool (`<tool> --model M -p PROMPT`) |
 
 ### Signals
 
-Structured output from agents/scripts — XML tags in stdout:
+Structured output from agents/scripts — XML tags in stdout/stderr:
 
 ```xml
 <signal:ready>tk-5c46</signal:ready>
@@ -154,10 +159,10 @@ Structured output from agents/scripts — XML tags in stdout:
 ```
 
 Built-in signals (handled by engine, don't affect routing):
-- `update` — progress display
+- `update` — progress display (shown in real-time)
 - `var` — persist key-value pair to `.pilot/vars`
 
-Domain signals (`ready`, `approved`, `rejected`, `failed`, etc.) are config-defined per stage via `on_signal`.
+Domain signals (`ready`, `approved`, `rejected`, `failed`, etc.) are config-defined per stage via `on_signal`. Displayed in real-time as they stream from the executor.
 
 ### Transitions
 
@@ -241,17 +246,24 @@ All vars and state cleaned on `__exit__`.
 
 Engine behavior (not in config): primary runner retries twice, then fallback runner retries twice. If all 4 attempts fail, the round fails. Three consecutive round failures stop the pipeline.
 
+### Timing
+
+Each round displays its duration after completion. On pipeline exit, total rounds and elapsed time are shown.
+
 ## Persistence
 
 **State** (`.pilot/state`) — current stage name. Survives crashes — the engine resumes where it left off. Cleaned on `__exit__`.
 
 **Vars** (`.pilot/vars`) — see [Vars](#vars) above. Survives crashes. Cleaned on `__exit__`.
 
+**Logs** (`.pilot/logs/`) — real-time session logs with timestamps. One file per run (`pilot-{timestamp}.log`). Everything logged: executor output, signals, transitions, errors.
+
 ## Commands
 
 ```
 pilot run <pipeline.yaml>              Run the pipeline
 pilot run <pipeline.yaml> --dry-run    Show stages without executing
+pilot run <pipeline.yaml> --verbose    Stream executor output to terminal
 pilot validate <pipeline.yaml>         Validate config
 pilot init                             Scaffold .pilot/ with default dev pipeline
 ```
@@ -263,21 +275,22 @@ pilot/                    # Python package (source)
   cli.py                  CLI entry point
   config.py               YAML loading + validation
   models.py               Stage, Runner, Transition, PipelineConfig
-  engine.py               State machine loop (retry, fallback, signals)
+  engine.py               State machine loop (retry, fallback, signals, timing)
   signals.py              <signal:NAME> parser (XML with attrs)
   templates.py            {{file:path}} and {{var:NAME}} resolution
   state.py                .pilot/state read/write
   vars.py                 .pilot/vars read/write/export
-  display.py              Terminal output (rich)
+  display.py              Terminal output (rich), real-time log file
   executors/
     shell.py              Shell command executor
     claude.py             Claude Code (JSON stream)
-    codex.py              Codex CLI
-    opencode.py           OpenCode (dangerous mode)
+    codex.py              Codex CLI (stderr/stdout split)
+    opencode.py           OpenCode (-m provider/model)
     generic.py            Generic CLI tool
   defaults/
     develop/              Shipped dev pipeline template
 scripts/
   pilot-docker            Docker wrapper with credential forwarding
-  init-docker.sh          Container entrypoint (credential copy)
+  init-docker.sh          Container entrypoint (UID remap, credentials, permissions)
+Dockerfile                Python + node + CLI tools + tini
 ```
