@@ -34,10 +34,12 @@ Strictly sequential. No skipping.
 ## Result: PASS
 
 1. `tk add-note {{var:PILOT_TASK_ID}} "PASS: <summary>"`.
-2. Emit `<signal:approved>summary</signal:approved>`. **STOP.**
+2. `git add .tickets/ && git commit -m "{{var:PILOT_TASK_ID}}: review pass" --quiet`.
+3. Emit `<signal:approved>summary</signal:approved>`. **STOP.**
 
 ## Result: FAIL
 
 1. **One pass.** Find ALL issues at once. No incremental reviews.
 2. `tk add-note {{var:PILOT_TASK_ID}} "FAIL:\n- <file:line> <issue>\nFIX: <concrete steps>"`.
-3. Emit `<signal:rejected>issues found</signal:rejected>`. **STOP.**
+3. `git add .tickets/ && git commit -m "{{var:PILOT_TASK_ID}}: review fail" --quiet`.
+4. Emit `<signal:rejected>issues found</signal:rejected>`. **STOP.**

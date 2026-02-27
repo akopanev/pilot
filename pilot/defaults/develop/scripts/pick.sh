@@ -20,12 +20,11 @@ if ! tk ls &>/dev/null; then
   exit 0
 fi
 
-# Dirty working tree = trouble
-DIRTY=$(git status --porcelain)
-if [ -n "$DIRTY" ]; then
-  echo "<signal:failed>uncommitted changes — commit or stash before running pilot
-$DIRTY</signal:failed>"
-  exit 0
+# Commit any leftover changes (agent crash, reviewer notes, etc.)
+if [ -n "$(git status --porcelain)" ]; then
+  echo "<signal:update>committing leftover changes</signal:update>"
+  git add -A
+  git commit -m "pilot: auto-commit leftover changes" --quiet
 fi
 
 # Clean slate
