@@ -6,7 +6,7 @@ Config-driven pipeline engine for AI agents. Define stages, transitions, and run
 
 ```bash
 # One-line install (from private repo)
-curl -sSL https://raw.githubusercontent.com/akopanev/pilot/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/akopanev/pilot/master/install.sh | bash
 
 # Or from a local checkout
 PILOT_REPO=/path/to/pilot bash install.sh
