@@ -4,13 +4,20 @@
 # then drops to pilot via gosu.
 
 # Remap pilot user to match host UID
-APP_UID="${APP_UID:-1000}"
-if [ "$(id -u pilot)" != "$APP_UID" ]; then
-    usermod -u "$APP_UID" pilot 2>/dev/null
+PILOT_UID="${PILOT_UID:-1000}"
+if [ "$(id -u pilot)" != "$PILOT_UID" ]; then
+    usermod -u "$PILOT_UID" pilot 2>/dev/null
 fi
-chown -R pilot:pilot /home/pilot
+chown -R pilot:pilot /home/pilot 2>/dev/null || true
 
 export HOME=/home/pilot
+
+# Git config (mounted read-only at /mnt, copied so we can add safe.directory)
+if [ -f /mnt/gitconfig ]; then
+    cp /mnt/gitconfig /home/pilot/.gitconfig
+fi
+git config -f /home/pilot/.gitconfig safe.directory /workspace
+chown pilot:pilot /home/pilot/.gitconfig 2>/dev/null || true
 
 # Claude config (settings, agents, etc.)
 if [ -d /mnt/claude ]; then

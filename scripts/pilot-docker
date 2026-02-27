@@ -182,10 +182,10 @@ def build_volumes(creds_temp: Optional[Path], claude_home: Optional[Path] = None
     if opencode_auth.exists():
         add(opencode_auth.resolve(), "/mnt/opencode-auth.json", ro=True)
 
-    # Git config
+    # Git config (mounted to /mnt, copied by init-docker.sh)
     gitconfig = home / ".gitconfig"
     if gitconfig.exists():
-        add(gitconfig.resolve(), "/home/pilot/.gitconfig", ro=True)
+        add(gitconfig.resolve(), "/mnt/gitconfig", ro=True)
 
     # Global gitignore
     global_gitignore = _get_global_gitignore()
@@ -219,7 +219,7 @@ def run_docker(image: str, volumes: list[str], args: list[str]) -> int:
         cmd.append("-it")
     cmd.extend(["--rm", "--init"])
 
-    cmd.extend(["-e", f"APP_UID={os.getuid()}"])
+    cmd.extend(["-e", f"PILOT_UID={os.getuid()}"])
 
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "PILOT_DEBUG"):
         val = os.environ.get(key)
