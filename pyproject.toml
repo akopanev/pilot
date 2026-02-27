@@ -18,7 +18,6 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["src"]
 include = ["pilot*"]
 
 [tool.setuptools.package-data]

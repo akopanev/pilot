@@ -204,25 +204,25 @@ pilot init                             Scaffold .pilot/ with default dev pipelin
 ## Project Structure
 
 ```
-src/pilot/
-  cli.py            CLI entry point
-  config.py         YAML loading + validation
-  models.py         Stage, Runner, Transition, PipelineConfig
-  engine.py         State machine loop (retry, fallback, signals)
-  signals.py        <signal:NAME> parser (XML with attrs)
-  templates.py      {{file:path}} and {{var:NAME}} resolution
-  state.py          .pilot/state read/write
-  vars.py           .pilot/vars read/write/export
-  display.py        Terminal output (rich)
+pilot/                    # Python package (source)
+  cli.py                  CLI entry point
+  config.py               YAML loading + validation
+  models.py               Stage, Runner, Transition, PipelineConfig
+  engine.py               State machine loop (retry, fallback, signals)
+  signals.py              <signal:NAME> parser (XML with attrs)
+  templates.py            {{file:path}} and {{var:NAME}} resolution
+  state.py                .pilot/state read/write
+  vars.py                 .pilot/vars read/write/export
+  display.py              Terminal output (rich)
   executors/
-    shell.py        Shell command executor
-    claude.py       Claude Code (JSON stream)
-    codex.py        Codex CLI
-    opencode.py     OpenCode (dangerous mode)
-    generic.py      Generic CLI tool
+    shell.py              Shell command executor
+    claude.py             Claude Code (JSON stream)
+    codex.py              Codex CLI
+    opencode.py           OpenCode (dangerous mode)
+    generic.py            Generic CLI tool
   defaults/
-    develop/        Shipped dev pipeline template
+    develop/              Shipped dev pipeline template
 scripts/
-  pilot-docker      Docker wrapper with credential forwarding
-  init-docker.sh    Container entrypoint (credential copy)
+  pilot-docker            Docker wrapper with credential forwarding
+  init-docker.sh          Container entrypoint (credential copy)
 ```
