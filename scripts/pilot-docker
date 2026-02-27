@@ -190,10 +190,10 @@ def build_volumes(creds_temp: Optional[Path], claude_home: Optional[Path] = None
     if gitconfig.exists():
         add(gitconfig.resolve(), "/mnt/gitconfig", ro=True)
 
-    # Global gitignore
+    # Global gitignore (mounted to /mnt, copied by init-docker.sh)
     global_gitignore = _get_global_gitignore()
     if global_gitignore:
-        add(global_gitignore.resolve(), str(global_gitignore), ro=True)
+        add(global_gitignore.resolve(), "/mnt/gitignore_global", ro=True)
 
     return vols
 

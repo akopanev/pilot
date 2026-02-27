@@ -17,6 +17,12 @@ if [ -f /mnt/gitconfig ]; then
     cp /mnt/gitconfig /home/pilot/.gitconfig
 fi
 git config -f /home/pilot/.gitconfig safe.directory /workspace
+# Global gitignore (copied from host)
+if [ -f /mnt/gitignore_global ]; then
+    mkdir -p /home/pilot/.config/git
+    cp /mnt/gitignore_global /home/pilot/.config/git/ignore
+    chown -R pilot:pilot /home/pilot/.config/git
+fi
 chown pilot:pilot /home/pilot/.gitconfig 2>/dev/null || true
 
 # Claude config (settings, agents, etc.)

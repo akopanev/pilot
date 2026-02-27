@@ -20,10 +20,8 @@ if ! tk ls &>/dev/null; then
   exit 0
 fi
 
-# Dirty working tree = trouble (exclude .pilot/ runtime files)
-DIRTY=$(git status --porcelain -- . ':!.pilot/state' ':!.pilot/vars' ':!.pilot/logs' 2>&1)
-if [ -n "$DIRTY" ]; then
-  echo "<signal:update>dirty: $DIRTY</signal:update>"
+# Dirty working tree = trouble
+if [ -n "$(git status --porcelain)" ]; then
   echo "<signal:failed>uncommitted changes — commit or stash before running pilot</signal:failed>"
   exit 0
 fi
@@ -49,10 +47,10 @@ git commit -m "$TASK: start" --quiet
 BRANCH="feat/$TASK"
 git checkout -B "$BRANCH"
 
-OPEN=$(tk ls 2>/dev/null | wc -l | tr -d ' ')
+TOTAL=$(tk ls 2>/dev/null | wc -l | tr -d ' ')
 CLOSED=$(tk ls --status closed 2>/dev/null | wc -l | tr -d ' ')
-TOTAL=$((OPEN + CLOSED))
-echo "<signal:update>$OPEN / $TOTAL tasks remaining</signal:update>"
+REMAINING=$((TOTAL - CLOSED))
+echo "<signal:update>$REMAINING / $TOTAL tasks remaining</signal:update>"
 echo "<signal:var key=PILOT_TASK_ID>$TASK</signal:var>"
 echo "<signal:var key=PILOT_WORKING_BRANCH>$BRANCH</signal:var>"
 echo "<signal:ready>$TASK</signal:ready>"
