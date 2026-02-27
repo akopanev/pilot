@@ -5,6 +5,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git nodejs npm ripgrep bash curl ca-certificates jq gosu \
     && rm -rf /var/lib/apt/lists/*
 
+# Enable corepack (pnpm/yarn available without separate install)
+RUN corepack enable
+
 # Install CLI tools
 RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
     && command -v claude >/dev/null \
