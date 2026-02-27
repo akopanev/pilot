@@ -150,12 +150,11 @@ Structured output from agents/scripts — XML tags in stdout:
 <signal:failed>build error</signal:failed>
 ```
 
-Built-in signals:
-- `update` — progress display (doesn't affect routing)
-- `failed` — stop pipeline with error
+Built-in signals (handled by engine, don't affect routing):
+- `update` — progress display
 - `var` — persist key-value pair to `.pilot/vars`
 
-Domain signals (`ready`, `approved`, `rejected`, etc.) are config-defined per stage.
+Domain signals (`ready`, `approved`, `rejected`, `failed`, etc.) are config-defined per stage via `on_signal`.
 
 ### Transitions
 

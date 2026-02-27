@@ -110,11 +110,6 @@ class PipelineEngine:
             # Parse signals
             signals = result.signals or parse_signals(result.output, known)
 
-            # Built-in: failed
-            failed = next((s for s in signals if s.name == "failed"), None)
-            if failed:
-                raise PipelineError(f"Agent failed: {failed.content}")
-
             # Built-in: var — persist to vars file
             # Format: <signal:var key=NAME>value
             for s in signals:

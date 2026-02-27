@@ -46,7 +46,9 @@ if [[ -n "${PILOT_REPO:-}" ]]; then
         "$PILOT_REPO/" "$INSTALL_DIR/"
 elif [[ -d "$INSTALL_DIR/.git" ]]; then
     info "Updating existing install..."
-    git -C "$INSTALL_DIR" pull --ff-only
+    git -C "$INSTALL_DIR" fetch --quiet
+    git -C "$INSTALL_DIR" reset --hard origin/master
+    git -C "$INSTALL_DIR" clean -fdx --exclude='.venv'
 else
     info "Cloning PILOT..."
     git clone "$REPO_URL" "$INSTALL_DIR"

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 # <signal:NAME>content  or  <signal:NAME key=value>content
 SIGNAL_RE = re.compile(r"<signal:(\w+)(\s+[^>]*)?>([^<]*)")
 
-BUILTIN_SIGNALS = frozenset({"update", "failed", "var"})
+BUILTIN_SIGNALS = frozenset({"update", "var"})
 
 
 @dataclass

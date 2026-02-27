@@ -6,11 +6,7 @@ starting: pick
 vars:
   PILOT_DEFAULT_BRANCH: master
 
-
-start: pick
-
 stages:
-
   # Pick next task from tracker, create feature branch
   pick:
     runner:
@@ -20,6 +16,7 @@ stages:
     on_signal:
       ready: implement      # task picked — go implement
       completed: __exit__   # no tasks left — stop pipeline
+      failed: __exit__      # fatal error — stop pipeline
       default: pick         # retry
 
   # Implement the task (codex primary, claude fallback)
@@ -33,6 +30,7 @@ stages:
       executor: claude-code
       model: sonnet
     on_signal:
+      failed: __exit__      # agent failed — stop pipeline
       default: review       # always goes to review
 
   # Code review — approve or reject
@@ -45,6 +43,7 @@ stages:
     on_signal:
       approved: merge       # pass — squash merge
       rejected: fix         # fail — send back for fixes
+      failed: __exit__      # agent failed — stop pipeline
       default: review       # no signal — retry review
 
   # Squash merge feature branch, close task, clean up
@@ -54,6 +53,7 @@ stages:
       command: |
         {{file:scripts/merge.sh}}
     on_signal:
+      failed: __exit__      # merge failed — stop pipeline
       default: pick         # back to picking next task
 
   # Address review feedback
@@ -67,4 +67,5 @@ stages:
       executor: claude-code
       model: sonnet
     on_signal:
+      failed: __exit__      # agent failed — stop pipeline
       default: review       # always back to review
