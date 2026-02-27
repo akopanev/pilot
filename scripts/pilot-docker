@@ -177,8 +177,11 @@ def build_volumes(creds_temp: Optional[Path], claude_home: Optional[Path] = None
         add(codex_dir.resolve(), "/mnt/codex", ro=True)
         add_symlink_targets(codex_dir)
 
-    # OpenCode auth
-    opencode_auth = home / ".opencode" / "auth.json"
+    # OpenCode config + auth
+    opencode_config = home / ".config" / "opencode"
+    if opencode_config.is_dir():
+        add(opencode_config.resolve(), "/mnt/opencode-config", ro=True)
+    opencode_auth = home / ".local" / "share" / "opencode" / "auth.json"
     if opencode_auth.exists():
         add(opencode_auth.resolve(), "/mnt/opencode-auth.json", ro=True)
 
@@ -221,7 +224,7 @@ def run_docker(image: str, volumes: list[str], args: list[str]) -> int:
 
     cmd.extend(["-e", f"PILOT_UID={os.getuid()}"])
 
-    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "PILOT_DEBUG"):
+    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "ZHIPU_API_KEY", "PILOT_DEBUG"):
         val = os.environ.get(key)
         if val:
             cmd.extend(["-e", f"{key}={val}"])
