@@ -24,7 +24,9 @@ fi
 
 # Claim and branch
 tk start "$TASK"
-git checkout -B "feat/$TASK"
+BRANCH="feat/$TASK"
+git checkout -B "$BRANCH"
 
 echo "<signal:var key=PILOT_TASK_ID>$TASK</signal:var>"
+echo "<signal:var key=PILOT_WORKING_BRANCH>$BRANCH</signal:var>"
 echo "<signal:ready>$TASK</signal:ready>"

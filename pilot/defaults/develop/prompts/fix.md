@@ -13,7 +13,7 @@ Strictly sequential. No skipping.
 
 1. **Read task and notes**: `tk show {{var:PILOT_TASK_ID}}`. Find the FAIL reasons.
 2. **Emit**: `<signal:update>fix: {{var:PILOT_TASK_ID}}</signal:update>`.
-3. **Checkout**: `git checkout feat/{{var:PILOT_TASK_ID}}`.
+3. **Checkout**: `git checkout {{var:PILOT_WORKING_BRANCH}}`.
 4. **Fix**:
    - Emit `<signal:update>fixing</signal:update>`.
    - **Surgical.** Fix ONLY the reported issues.

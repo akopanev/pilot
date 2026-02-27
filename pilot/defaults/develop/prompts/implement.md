@@ -13,7 +13,7 @@ Strictly sequential. No skipping.
 
 1. **Read task**: `tk show {{var:PILOT_TASK_ID}}`.
 2. **Emit**: `<signal:update>implement: {{var:PILOT_TASK_ID}}</signal:update>`.
-3. **Branch**: Confirm on `feat/{{var:PILOT_TASK_ID}}`. If not: `git checkout feat/{{var:PILOT_TASK_ID}}`.
+3. **Branch**: Confirm on `{{var:PILOT_WORKING_BRANCH}}`. If not: `git checkout {{var:PILOT_WORKING_BRANCH}}`.
    - Branch has commits? Read `git diff` / `git log`. Understand existing work.
 4. **Context**:
    - Emit `<signal:update>reading source</signal:update>`.

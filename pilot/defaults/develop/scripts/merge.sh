@@ -2,20 +2,17 @@
 set -euo pipefail
 
 # Squash-merge feature branch, close task, clean up.
-# Uses: $PILOT_DEFAULT_BRANCH, $PILOT_TASK_ID
-
-BRANCH="$PILOT_DEFAULT_BRANCH"
-TASK="$PILOT_TASK_ID"
+# Uses: $PILOT_DEFAULT_BRANCH, $PILOT_TASK_ID, $PILOT_WORKING_BRANCH
 
 # Merge
-git checkout "$BRANCH" --quiet
-git merge --squash "feat/$TASK"
-git commit -m "$TASK: merge"
+git checkout "$PILOT_DEFAULT_BRANCH" --quiet
+git merge --squash "$PILOT_WORKING_BRANCH"
+git commit -m "$PILOT_TASK_ID: merge"
 
 # Clean up
-git branch -D "feat/$TASK"
+git branch -D "$PILOT_WORKING_BRANCH"
 
 # Close task
-tk close "$TASK"
+tk close "$PILOT_TASK_ID"
 
-echo "<signal:update>merged $TASK</signal:update>"
+echo "<signal:update>merged $PILOT_TASK_ID</signal:update>"

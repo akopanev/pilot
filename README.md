@@ -94,6 +94,7 @@ The agent doesn't decide routing — the config does.
 
 ```yaml
 version: "0.1"
+starting: pick                # entry point (uses first stage if omitted)
 
 vars:                         # exported as env vars every round
   PILOT_DEFAULT_BRANCH: master
@@ -107,6 +108,7 @@ stages:
     on_signal:
       ready: implement        # signal → next stage
       completed: __exit__     # stop pipeline
+      failed: __exit__        # error → stop pipeline
       default: pick           # no signal → retry
 
   implement:
@@ -119,12 +121,13 @@ stages:
       executor: claude-code
       model: sonnet
     on_signal:
+      failed: __exit__
       default: review
 ```
 
 ### Stages
 
-Named steps. First stage in YAML is the entry point.
+Named steps. `starting:` sets the entry point (defaults to first stage if omitted). On crash recovery, the engine resumes from the saved state, not `starting:`.
 
 ### Runners
 
@@ -163,11 +166,76 @@ Signal-to-stage mapping in `on_signal:`:
 - `completed: __exit__` — stop the pipeline
 - `default: pick` — fallback when no domain signal is emitted
 
-### Templates
+### Templates & Prompt Building
 
-Resolved in prompts and commands before execution:
-- `{{file:path}}` — inline file contents (relative to config dir, recursive)
-- `{{var:NAME}}` — inline var value from `.pilot/vars`
+Before each round, the engine builds the prompt by resolving templates in `prompt:` (AI stages) or `command:` (shell stages).
+
+Two template types:
+
+**`{{file:path}}`** — inline file contents, relative to `.pilot/` directory:
+```yaml
+prompt: |
+  {{file:prompts/implement.md}}
+```
+Files can reference other files (recursive, max depth 10). This keeps prompts DRY — shared context referenced, not duplicated.
+
+**`{{var:NAME}}`** — inline a var value from `.pilot/vars`:
+```markdown
+Task: {{var:PILOT_TASK_ID}}
+Branch: {{var:PILOT_WORKING_BRANCH}}
+```
+Resolved fresh each round, so vars set by earlier stages are available to later ones.
+
+### Vars
+
+Persistent key-value pairs in `.pilot/vars`, exported as **env vars** every round and available as **`{{var:NAME}}`** in templates.
+
+```
+PILOT_DEFAULT_BRANCH=master
+PILOT_TASK_ID=nw-5c46
+PILOT_WORKING_BRANCH=feat/nw-5c46
+```
+
+**Three sources:**
+
+1. **`vars:` in pipeline.yaml** — config defaults, written every round
+2. **`<signal:var key=NAME>value</signal:var>`** — emitted by agents/scripts at runtime
+3. **Direct file edit** — shell scripts can write to `.pilot/vars` directly
+
+**Flow example (vars + state file):**
+```
+Round 1 (pick):
+  .pilot/state → pick 1
+  1. Engine writes config vars to .pilot/vars   → PILOT_DEFAULT_BRANCH=master
+  2. Engine exports vars as env vars            → $PILOT_DEFAULT_BRANCH in shell
+  3. pick.sh runs, emits:
+       <signal:var key=PILOT_TASK_ID>nw-5c46</signal:var>
+       <signal:var key=PILOT_WORKING_BRANCH>feat/nw-5c46</signal:var>
+       <signal:ready>nw-5c46</signal:ready>
+  4. Engine writes vars to .pilot/vars
+  5. Engine routes: ready → implement
+  .pilot/state → implement 1
+
+Round 2 (implement):
+  .pilot/state → implement 2
+  1. Engine exports all vars as env vars
+  2. Engine resolves templates in prompt:
+       {{var:PILOT_TASK_ID}}          → "nw-5c46"
+       {{var:PILOT_WORKING_BRANCH}}   → "feat/nw-5c46"
+  3. Resolved prompt sent to executor
+  4. No domain signal → default → review
+  .pilot/state → review 2
+
+Pipeline exit (__exit__):
+  .pilot/state → deleted
+  .pilot/vars  → deleted
+```
+
+Vars available two ways:
+- **`{{var:NAME}}`** in prompts — resolved by engine before sending to executor
+- **`$NAME`** as env vars — available in shell scripts
+
+All vars and state cleaned on `__exit__`.
 
 ### Retry & Fallback
 
@@ -177,19 +245,7 @@ Engine behavior (not in config): primary runner retries twice, then fallback run
 
 **State** (`.pilot/state`) — current stage and round number. Survives crashes — the engine resumes where it left off. Cleaned on `__exit__`.
 
-**Vars** (`.pilot/vars`) — persistent key-value pairs exported as env vars every round:
-
-```
-PILOT_DEFAULT_BRANCH=master
-PILOT_TASK_ID=tk-5c46
-```
-
-Three sources:
-1. `vars:` in pipeline.yaml — written every round
-2. `<signal:var key=NAME>value</signal:var>` — emitted by agents/scripts
-3. Direct file edit — scripts can write to `.pilot/vars` directly
-
-All cleaned on `__exit__`.
+**Vars** (`.pilot/vars`) — see [Vars](#vars) above. Survives crashes. Cleaned on `__exit__`.
 
 ## Commands
 

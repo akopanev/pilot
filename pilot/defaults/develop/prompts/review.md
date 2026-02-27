@@ -16,7 +16,7 @@ Strictly sequential. No skipping.
 1. **Read task**: `tk show {{var:PILOT_TASK_ID}}`.
 2. **Emit**: `<signal:update>review: {{var:PILOT_TASK_ID}}</signal:update>`.
 3. **Read notes**: `tk show {{var:PILOT_TASK_ID}}` — check existing notes.
-4. **Checkout**: `git checkout feat/{{var:PILOT_TASK_ID}}`.
+4. **Checkout**: `git checkout {{var:PILOT_WORKING_BRANCH}}`.
 5. **Diff**: `git diff {{var:PILOT_DEFAULT_BRANCH}}...HEAD`. No changes? PASS.
 6. **Read code**: Open and read every changed file. Understand the full context — not just the diff.
 7. **Verify**:
