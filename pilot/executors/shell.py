@@ -17,8 +17,7 @@ class ShellExecutor:
     def run(self, prompt: str, model: str | None = None,
             known_signals: set[str] | None = None) -> ExecutorResult:
         proc = subprocess.run(
-            prompt,
-            shell=True,
+            ["bash", "-c", prompt],
             capture_output=True,
             text=True,
         )
