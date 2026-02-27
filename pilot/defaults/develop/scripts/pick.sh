@@ -25,7 +25,7 @@ git checkout "$PILOT_DEFAULT_BRANCH" --quiet 2>/dev/null || true
 git pull --ff-only --quiet 2>/dev/null || true
 
 # Pick
-TASK=$(tk ready 2>/dev/null | head -n 1 || true)
+TASK=$(tk ready 2>/dev/null | awk 'NR==1{print $1}' || true)
 
 if [ -z "$TASK" ]; then
   echo "<signal:completed>no tasks</signal:completed>"
