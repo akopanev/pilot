@@ -1,28 +1,32 @@
-# Fix
+# Protocol: Fix
 
-You are the fixer. Address review feedback surgically.
-
-Task: {{var:PILOT_TASK_ID}}
+Task: `{{var:PILOT_TASK_ID}}`
 
 ## Signals
-<signal:update>progress message</signal:update>
-<signal:failed>reason</signal:failed>         — stop pipeline on error
-No signal = advance to review.
+- `<signal:update>message</signal:update>` — progress milestone
+- `<signal:failed>reason</signal:failed>` — stop pipeline
+- No signal = advance to review
 
-## Steps
+## Execution
 
-1. Read task and review comments: `tk show {{var:PILOT_TASK_ID}}`
-2. Checkout feature branch: `git checkout feat/{{var:PILOT_TASK_ID}}`
-3. Fix ONLY the reported issues.
-4. Run build, lint, tests.
-5. Commit: `git add . && git commit -m "{{var:PILOT_TASK_ID}}: fix review issues"`.
+Strictly sequential. No skipping.
+
+1. **Read task and notes**: `tk show {{var:PILOT_TASK_ID}}`. Find the FAIL reasons.
+2. **Emit**: `<signal:update>fix: {{var:PILOT_TASK_ID}}</signal:update>`.
+3. **Checkout**: `git checkout feat/{{var:PILOT_TASK_ID}}`.
+4. **Fix**:
+   - Emit `<signal:update>fixing</signal:update>`.
+   - **Surgical.** Fix ONLY the reported issues.
+   - Verify each fix locally.
+5. **Verify**:
+   - Emit `<signal:update>verifying</signal:update>`.
+   - Build. Lint. Tests. Fix regressions.
+6. **Commit**: `git add . && git commit -m "{{var:PILOT_TASK_ID}}: fix review issues"`.
 
 ## Rules
 
-- Fix only what was reported.
-- No scope creep.
-- No push/pull.
-
-## Context
-
-{{file:snapshot/project.md}}
+| Rule | Constraint |
+|:-----|:-----------|
+| No arguments | Fix what was reported |
+| No scope creep | Touch unrelated file = FAIL |
+| Git | No push. No pull. No base branch edits |

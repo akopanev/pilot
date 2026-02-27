@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Pick next ready task, create branch, hand off to implement.
-# Emits: <signal:ready>task-id</signal:ready>  or  <signal:completed>no tasks</signal:completed>
-# Uses: $PILOT_DEFAULT_BRANCH (from pipeline.yaml vars)
-# Requires: tk (task tracker CLI) — replace with your own tracker command
+# Pick next ready task, create feature branch.
+# Emits: <signal:ready>id</signal:ready> or <signal:completed>no tasks</signal:completed>
+# Uses: $PILOT_DEFAULT_BRANCH
 
 if ! command -v tk &>/dev/null; then
-  echo "<signal:failed>tk command not found — install your task tracker or edit scripts/pick.sh</signal:failed>"
+  echo "<signal:failed>tk command not found — install ticket (https://github.com/wedow/ticket) or edit scripts/pick.sh</signal:failed>"
   exit 0
 fi
 
-# Start from clean default branch
+# Clean slate
 git checkout "$PILOT_DEFAULT_BRANCH" --quiet 2>/dev/null || true
+git pull --ff-only --quiet 2>/dev/null || true
 
+# Pick
 TASK=$(tk ready | head -n 1 || true)
 
 if [ -z "$TASK" ]; then
@@ -21,7 +22,7 @@ if [ -z "$TASK" ]; then
   exit 0
 fi
 
-# Claim it and create feature branch
+# Claim and branch
 tk start "$TASK"
 git checkout -B "feat/$TASK"
 

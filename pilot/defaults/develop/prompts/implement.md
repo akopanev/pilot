@@ -1,32 +1,45 @@
-# Implement
+# Protocol: Implement
 
-You are the developer. Implement the current task with precision.
-
-Task: {{var:PILOT_TASK_ID}}
+Task: `{{var:PILOT_TASK_ID}}`
 
 ## Signals
-<signal:update>progress message</signal:update>
-<signal:failed>reason</signal:failed>         — stop pipeline on error
-No signal = advance to review.
+- `<signal:update>message</signal:update>` — progress milestone
+- `<signal:failed>reason</signal:failed>` — stop pipeline
+- No signal = advance to review
 
-## Steps
+## Execution
 
-1. Read task details: `tk show {{var:PILOT_TASK_ID}}`
-2. Read relevant source code. Understand before changing.
-3. Plan: check imports, types, patterns.
-4. Implement. Test first. Handle errors.
-5. Run build/check command.
-6. Run tests. Fix regressions.
-7. Self-review: correctness, completeness, scope, security.
-8. Commit: `git add . && git commit -m "{{var:PILOT_TASK_ID}}: <summary>"`.
+Strictly sequential. No skipping.
+
+1. **Read task**: `tk show {{var:PILOT_TASK_ID}}`.
+2. **Emit**: `<signal:update>implement: {{var:PILOT_TASK_ID}}</signal:update>`.
+3. **Branch**: Confirm on `feat/{{var:PILOT_TASK_ID}}`. If not: `git checkout feat/{{var:PILOT_TASK_ID}}`.
+   - Branch has commits? Read `git diff` / `git log`. Understand existing work.
+4. **Context**:
+   - Emit `<signal:update>reading source</signal:update>`.
+   - Read relevant source code. **MUST** understand before changing.
+   - Check imports, types, patterns in surrounding code.
+5. **Implement**:
+   - Emit `<signal:update>implementing</signal:update>`.
+   - Strict scope. Only files related to the task.
+   - Test first. Handle errors.
+6. **Verify**:
+   - Emit `<signal:update>verifying</signal:update>`.
+   - Build. Lint. Tests. Fix regressions.
+7. **Self-review**:
+   - Emit `<signal:update>self-review</signal:update>`.
+   - Correctness — does it match the task?
+   - Completeness — all requirements covered?
+   - Patterns — follows existing codebase conventions?
+   - Scope — no unrelated changes?
+   - Security — no secrets, no vulnerabilities?
+8. **Commit**: `git add . && git commit -m "{{var:PILOT_TASK_ID}}: <summary>"`.
 
 ## Rules
 
-- Strict scope. Only files related to the task.
-- No dead code, no TODOs.
-- No push/pull.
-
-## Context
-
-{{file:snapshot/project.md}}
-{{file:snapshot/conventions.md}}
+| Rule | Constraint |
+|:-----|:-----------|
+| Scope | Touch unrelated file = FAIL |
+| Clean | Dead code / TODOs = FAIL |
+| Git | No push. No pull. No base branch edits |
+| Deps | Only add if task requires it |

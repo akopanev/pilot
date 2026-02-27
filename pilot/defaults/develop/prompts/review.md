@@ -1,32 +1,43 @@
-# Review
+# Protocol: Review
 
-You are the code reviewer. Verify the implementation is correct and complete.
-
-Task: {{var:PILOT_TASK_ID}}
+Task: `{{var:PILOT_TASK_ID}}`
 
 ## Signals
-<signal:update>progress message</signal:update>
-<signal:approved>summary</signal:approved>       — pass review, back to pick
-<signal:rejected>issues</signal:rejected>        — fail review, send to fix
-<signal:failed>reason</signal:failed>            — stop pipeline on error
-No signal = retry review.
+- `<signal:update>message</signal:update>` — progress milestone
+- `<signal:approved>summary</signal:approved>` — pass review, advance to merge
+- `<signal:rejected>issues</signal:rejected>` — fail review, send to fix
+- `<signal:failed>reason</signal:failed>` — stop pipeline
+- No signal = retry review
 
-## Steps
+## Execution
 
-1. Read task details: `tk show {{var:PILOT_TASK_ID}}`
-2. Checkout feature branch: `git checkout feat/{{var:PILOT_TASK_ID}}`
-3. Diff: `git diff $PILOT_DEFAULT_BRANCH...HEAD`
-4. Verify:
-   - Build passes.
-   - Lint passes.
-   - Tests pass.
-   - Changes match task requirements.
-   - No dead code, no TODOs.
-   - No secrets or vulnerabilities.
-   - No unrelated files.
-5. **PASS**: Emit `<signal:approved>summary</signal:approved>`.
-6. **FAIL**: Add review notes to task: `tk comment {{var:PILOT_TASK_ID}} "issues"`. Emit `<signal:rejected>issues</signal:rejected>`.
+Strictly sequential. No skipping.
 
-## Context
+1. **Read task**: `tk show {{var:PILOT_TASK_ID}}`.
+2. **Emit**: `<signal:update>review: {{var:PILOT_TASK_ID}}</signal:update>`.
+3. **Read notes**: `tk show {{var:PILOT_TASK_ID}}` — check existing notes.
+4. **Checkout**: `git checkout feat/{{var:PILOT_TASK_ID}}`.
+5. **Diff**: `git diff {{var:PILOT_DEFAULT_BRANCH}}...HEAD`. No changes? PASS.
+6. **Read code**: Open and read every changed file. Understand the full context — not just the diff.
+7. **Verify**:
+   - Emit `<signal:update>verifying</signal:update>`.
+   - **Build**: Run build command. Fail? FAIL.
+   - **Lint**: Run linter. Fail? FAIL.
+   - **Tests**: Run tests. Fail? FAIL.
+   - **Manual check**:
+     - Correct? Changes match task requirements.
+     - Complete? All requirements addressed.
+     - Clean? No dead code, no TODOs.
+     - Safe? No secrets, no vulnerabilities.
+     - Scoped? No unrelated files changed.
 
-{{file:snapshot/project.md}}
+## Result: PASS
+
+1. `tk add-note {{var:PILOT_TASK_ID}} "PASS: <summary>"`.
+2. Emit `<signal:approved>summary</signal:approved>`. **STOP.**
+
+## Result: FAIL
+
+1. **One pass.** Find ALL issues at once. No incremental reviews.
+2. `tk add-note {{var:PILOT_TASK_ID}} "FAIL:\n- <file:line> <issue>\nFIX: <concrete steps>"`.
+3. Emit `<signal:rejected>issues found</signal:rejected>`. **STOP.**

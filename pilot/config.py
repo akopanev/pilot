@@ -114,9 +114,17 @@ def load_config(path: str) -> PipelineConfig:
                     f"unknown stage '{transition.to}'"
                 )
 
+    # Start stage: explicit or first in YAML
+    start_stage = raw.get("starting")
+    if start_stage:
+        if start_stage not in all_stage_names:
+            raise ConfigError(f"'starting' references unknown stage '{start_stage}'")
+    else:
+        start_stage = next(iter(stages))
+
     return PipelineConfig(
         version=version,
         vars=config_vars,
         stages=stages,
-        start_stage=next(iter(stages)),
+        start_stage=start_stage,
     )

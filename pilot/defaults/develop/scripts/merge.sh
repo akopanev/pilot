@@ -2,21 +2,20 @@
 set -euo pipefail
 
 # Squash-merge feature branch, close task, clean up.
-# Uses: $PILOT_DEFAULT_BRANCH, $PILOT_TASK_ID (set by engine)
-# Requires: tk (task tracker CLI) — replace with your own tracker command
+# Uses: $PILOT_DEFAULT_BRANCH, $PILOT_TASK_ID
 
 BRANCH="$PILOT_DEFAULT_BRANCH"
 TASK="$PILOT_TASK_ID"
 
-# Squash merge
+# Merge
 git checkout "$BRANCH" --quiet
 git merge --squash "feat/$TASK"
 git commit -m "$TASK: merge"
 
-# Clean up feature branch
+# Clean up
 git branch -D "feat/$TASK"
 
-# Close task in tracker
+# Close task
 tk close "$TASK"
 
 echo "<signal:update>merged $TASK</signal:update>"

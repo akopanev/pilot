@@ -1,10 +1,13 @@
 # Development pipeline — pick -> implement -> review -> fix cycle
-# Stages run top-to-bottom; first stage is the entry point.
 version: "0.1"
+starting: pick
 
 # Exported as env vars every round (key = var name)
 vars:
   PILOT_DEFAULT_BRANCH: master
+
+
+start: pick
 
 stages:
 
