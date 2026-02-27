@@ -7,8 +7,8 @@ import signal
 import subprocess
 import threading
 
-from pilot.signals import parse_signals
 from pilot.executors.result import ExecutorResult
+from pilot.signals import parse_signals
 
 
 class CodexExecutor:
@@ -45,10 +45,10 @@ class CodexExecutor:
             start_new_session=True,
         )
 
-        stderr_result: dict = {"last_lines": [], "error": None, "signals": []}
+        stderr_result: dict = {"last_lines": [], "error": None}
         stderr_thread = threading.Thread(
             target=self._process_stderr,
-            args=(proc.stderr, stderr_result, known_signals, on_output, on_signal),
+            args=(proc.stderr, stderr_result, on_output),
             daemon=True,
         )
         stderr_thread.start()
@@ -87,9 +87,6 @@ class CodexExecutor:
             if tail:
                 error += f"\nstderr: {tail}"
 
-        # Merge signals from both streams (stderr signals arrive first, in real-time)
-        all_signals = stderr_result["signals"] + all_signals
-
         return ExecutorResult(
             output=stdout_content,
             exit_code=proc.returncode,
@@ -98,12 +95,16 @@ class CodexExecutor:
         )
 
     @staticmethod
-    def _process_stderr(stream, result: dict, known_signals: set[str] | None = None,
-                        on_output: callable = None, on_signal: callable = None) -> None:
-        """Read stderr for progress display, logging, and real-time signal detection."""
+    def _process_stderr(stream, result: dict,
+                        on_output: callable = None) -> None:
+        """Read stderr for progress display only.
+
+        Signals are never parsed from stderr — codex echoes the prompt on
+        stderr, which would cause false signal detections from examples
+        in the prompt text.  Only stdout (the actual response) is parsed.
+        """
         max_tail = 5
         tail: list[str] = []
-        signals: list = []
 
         try:
             for line in stream:
@@ -113,10 +114,6 @@ class CodexExecutor:
                 stored = stripped[:256] + "..." if len(stripped) > 256 else stripped
                 if on_output:
                     on_output(stored)
-                for sig in parse_signals(stored, known_signals):
-                    signals.append(sig)
-                    if on_signal:
-                        on_signal(sig)
                 tail.append(stored)
                 if len(tail) > max_tail:
                     tail.pop(0)
@@ -124,7 +121,6 @@ class CodexExecutor:
             result["error"] = str(e)
 
         result["last_lines"] = tail
-        result["signals"] = signals
 
 
 def _kill_process_group(proc: subprocess.Popen) -> None:

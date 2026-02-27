@@ -14,5 +14,7 @@ git branch -D "$PILOT_WORKING_BRANCH"
 
 # Close task
 tk close "$PILOT_TASK_ID"
+git add .tickets/
+git commit -m "$PILOT_TASK_ID: close" --quiet
 
 echo "<signal:update>merged $PILOT_TASK_ID</signal:update>"
