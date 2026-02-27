@@ -41,4 +41,7 @@ if [ -f /mnt/opencode-auth.json ]; then
     chmod 600 "$HOME/.opencode/auth.json"
 fi
 
+# Git safe.directory — host-mounted workspace ownership won't match container user
+git config --global safe.directory /workspace
+
 exec "$@"

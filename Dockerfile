@@ -30,11 +30,6 @@ USER pilot
 # Docker marker
 ENV PILOT_DOCKER=1
 
-# Git safe.directory for host-mounted workspace
-ENV GIT_CONFIG_COUNT=1
-ENV GIT_CONFIG_KEY_0=safe.directory
-ENV GIT_CONFIG_VALUE_0=/workspace
-
 WORKDIR /workspace
 ENTRYPOINT ["/usr/local/bin/init-docker.sh"]
 CMD ["pilot", "run", ".pilot/pipeline.yaml"]
