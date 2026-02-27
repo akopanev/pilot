@@ -10,8 +10,8 @@ from pilot.models import PipelineState
 def read_state(path: str) -> PipelineState | None:
     """Read state from file. Returns None if file doesn't exist.
 
-    Format: stage round
-    Example: review 7
+    Format: stage
+    Example: review
     """
     if not os.path.isfile(path):
         return None
@@ -22,24 +22,14 @@ def read_state(path: str) -> PipelineState | None:
     if not line:
         return None
 
-    parts = line.split()
-    if len(parts) != 2:
-        return None
-
-    stage = parts[0]
-    try:
-        round_num = int(parts[1])
-    except ValueError:
-        return None
-
-    return PipelineState(stage=stage, round=round_num)
+    return PipelineState(stage=line.split()[0])
 
 
 def write_state(path: str, state: PipelineState) -> None:
     """Write state to file."""
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w") as f:
-        f.write(f"{state.stage} {state.round}\n")
+        f.write(f"{state.stage}\n")
 
 
 def clear_state(path: str) -> None:

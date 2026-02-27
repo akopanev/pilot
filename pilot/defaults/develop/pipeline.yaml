@@ -25,7 +25,7 @@ stages:
       {{file:prompts/implement.md}}
     runner:
       executor: codex
-      model: gpt-codex-5.3
+      model: gpt-5.3-codex
     fallback_runner:
       executor: claude-code
       model: sonnet
@@ -62,7 +62,7 @@ stages:
       {{file:prompts/fix.md}}
     runner:
       executor: codex
-      model: o3
+      model: gpt-5.3-codex
     fallback_runner:
       executor: claude-code
       model: sonnet

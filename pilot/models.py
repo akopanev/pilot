@@ -37,4 +37,3 @@ class PipelineConfig:
 @dataclass
 class PipelineState:
     stage: str
-    round: int

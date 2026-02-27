@@ -15,7 +15,9 @@ class ShellExecutor:
     """
 
     def run(self, prompt: str, model: str | None = None,
-            known_signals: set[str] | None = None) -> ExecutorResult:
+            known_signals: set[str] | None = None,
+            on_output: callable = None,
+            on_signal: callable = None) -> ExecutorResult:
         proc = subprocess.run(
             ["bash", "-c", prompt],
             capture_output=True,
@@ -23,7 +25,12 @@ class ShellExecutor:
         )
 
         output = proc.stdout
+        if on_output and output:
+            on_output(output)
         signals = parse_signals(output, known_signals)
+        if on_signal:
+            for sig in signals:
+                on_signal(sig)
 
         return ExecutorResult(
             output=output,

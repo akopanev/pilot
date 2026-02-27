@@ -20,7 +20,9 @@ class GenericExecutor:
         self.tool = tool
 
     def run(self, prompt: str, model: str | None = None,
-            known_signals: set[str] | None = None) -> ExecutorResult:
+            known_signals: set[str] | None = None,
+            on_output: callable = None,
+            on_signal: callable = None) -> ExecutorResult:
         cmd = [self.tool]
         if model:
             cmd.extend(["--model", model])
@@ -40,8 +42,12 @@ class GenericExecutor:
         try:
             for line in proc.stdout:
                 output_parts.append(line)
+                if on_output:
+                    on_output(line)
                 for sig in parse_signals(line, known_signals):
                     all_signals.append(sig)
+                    if on_signal:
+                        on_signal(sig)
 
             proc.wait()
         except KeyboardInterrupt:

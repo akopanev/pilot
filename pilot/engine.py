@@ -7,7 +7,7 @@ import threading
 from pilot.display import Display
 from pilot.executors import ExecutorPool
 from pilot.models import PipelineConfig, PipelineState, Stage
-from pilot.signals import BUILTIN_SIGNALS, parse_signals
+from pilot.signals import BUILTIN_SIGNALS
 from pilot.state import clear_state, read_state, write_state
 from pilot.templates import TemplateError, resolve_templates
 from pilot.vars import clear_vars, export_vars, write_var
@@ -44,14 +44,10 @@ class PipelineEngine:
         if saved and saved.stage in config.stages:
             self.state = saved
             self.display.info(
-                f"[dim]Resuming[/] [stage]{saved.stage}[/] "
-                f"[dim]round {saved.round}[/]"
+                f"[dim]Resuming[/] [stage]{saved.stage}[/]"
             )
         else:
-            self.state = PipelineState(
-                stage=config.start_stage,
-                round=0,
-            )
+            self.state = PipelineState(stage=config.start_stage)
 
     def _sync_env(self) -> None:
         """Export vars to file and os.environ.
@@ -66,9 +62,10 @@ class PipelineEngine:
 
     def run(self) -> None:
         consecutive_failures = 0
+        round_num = 0
 
         while not self.cancel.is_set():
-            self.state.round += 1
+            round_num += 1
             self._sync_env()
 
             stage = self.config.stages.get(self.state.stage)
@@ -76,7 +73,7 @@ class PipelineEngine:
                 raise PipelineError(f"Unknown stage: {self.state.stage}")
 
             self.display.round_header(
-                self.state.round,
+                round_num,
                 stage.name,
                 stage.runner.executor,
                 stage.runner.model,
@@ -107,23 +104,15 @@ class PipelineEngine:
 
             consecutive_failures = 0
 
-            # Parse signals
-            signals = result.signals or parse_signals(result.output, known)
+            # Signals already displayed in real-time via _on_signal callback
+            signals = self._live_signals
 
-            # Process and display all signals
+            # Find first domain signal for routing
             domain = None
             for s in signals:
-                if s.name == "var" and "key" in s.attrs:
-                    write_var(self.vars_path, s.attrs["key"], s.content)
-                    self.display.info(
-                        f"[dim]var[/] {s.attrs['key']}={s.content}"
-                    )
-                elif s.name == "update":
-                    self.display.update(s.content)
-                else:
-                    self.display.domain_signal(s.name, s.content)
-                    if domain is None:
-                        domain = s
+                if s.name not in ("var", "update"):
+                    domain = s
+                    break
 
             # Route
             if domain and domain.name in stage.on_signal:
@@ -162,8 +151,11 @@ class PipelineEngine:
         for runner, label in runners:
             executor = self.executors.get(runner.executor)
             for attempt in range(1, 3):
+                self._live_signals = []
                 result = executor.run(
                     prompt, model=runner.model, known_signals=known,
+                    on_output=self._on_output,
+                    on_signal=self._on_signal,
                 )
                 if result.exit_code == 0:
                     return result
@@ -198,6 +190,23 @@ class PipelineEngine:
             raw = stage.prompt or ""
 
         return resolve_templates(raw, self.config_dir, self.vars_path)
+
+    def _on_output(self, text: str) -> None:
+        """Real-time callback from executors — log streamed output."""
+        self.display.executor_output(text)
+
+    def _on_signal(self, sig) -> None:
+        """Real-time callback from executors — display and collect signals."""
+        self._live_signals.append(sig)
+        if sig.name == "var" and "key" in sig.attrs:
+            write_var(self.vars_path, sig.attrs["key"], sig.content)
+            self.display.info(
+                f"[dim]var[/] {sig.attrs['key']}={sig.content}"
+            )
+        elif sig.name == "update":
+            self.display.update(sig.content)
+        else:
+            self.display.domain_signal(sig.name, sig.content)
 
     def _wait(self) -> None:
         self.cancel.wait(timeout=self.delay)

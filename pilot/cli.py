@@ -8,6 +8,7 @@ import shutil
 import signal
 import sys
 import threading
+import time
 from pathlib import Path
 
 from pilot import __version__
@@ -33,7 +34,13 @@ def cmd_run(args) -> None:
         display.dry_run_stages(config.stages)
         return
 
+    # Open real-time log
+    log_dir = os.path.join(config_dir, "logs")
+    log_path = os.path.join(log_dir, f"pilot-{int(time.time())}.log")
+    display.open_log(log_path)
+
     display.info(f"[dim]Pipeline:[/] {config_path}")
+    display.info(f"[dim]Log:[/]      {log_path}")
     display.info(f"[dim]State:[/]    {state_path}")
     display.info(f"[dim]Vars:[/]     {vars_path}")
     display.info(f"[dim]Stages:[/]   {', '.join(config.stages.keys())}")
@@ -59,7 +66,10 @@ def cmd_run(args) -> None:
         display=display,
         cancel_event=cancel_event,
     )
-    engine.run()
+    try:
+        engine.run()
+    finally:
+        display.close()
 
 
 def cmd_validate(args) -> None:

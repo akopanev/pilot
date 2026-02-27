@@ -49,7 +49,9 @@ class ClaudeExecutor:
     """Runs claude CLI with streaming JSON parsing."""
 
     def run(self, prompt: str, model: str | None = None,
-            known_signals: set[str] | None = None) -> ExecutorResult:
+            known_signals: set[str] | None = None,
+            on_output: callable = None,
+            on_signal: callable = None) -> ExecutorResult:
         cmd = [
             "claude", "--dangerously-skip-permissions",
             "--output-format", "stream-json", "--verbose",
@@ -82,12 +84,20 @@ class ClaudeExecutor:
                     text = _extract_text(event)
                     if text:
                         output_parts.append(text)
+                        if on_output:
+                            on_output(text)
                         for sig in parse_signals(text, known_signals):
                             all_signals.append(sig)
+                            if on_signal:
+                                on_signal(sig)
                 except json.JSONDecodeError:
                     output_parts.append(line)
+                    if on_output:
+                        on_output(line)
                     for sig in parse_signals(line, known_signals):
                         all_signals.append(sig)
+                        if on_signal:
+                            on_signal(sig)
 
             proc.wait()
         except KeyboardInterrupt:

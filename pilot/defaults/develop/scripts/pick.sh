@@ -32,8 +32,12 @@ if [ -z "$TASK" ]; then
   exit 0
 fi
 
-# Claim and branch
+# Claim on default branch (visible to other agents, survives crashes)
 tk start "$TASK"
+git add .tickets/
+git commit -m "$TASK: start" --quiet
+
+# Feature branch
 BRANCH="feat/$TASK"
 git checkout -B "$BRANCH"
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from datetime import datetime
 
@@ -13,6 +14,9 @@ from rich.text import Text
 from rich.theme import Theme
 
 from pilot import __version__
+
+# Strip Rich markup for plain-text log
+_MARKUP_RE = re.compile(r"\[/?[^\]]*\]")
 
 PILOT_THEME = Theme({
     "stage": "bold cyan",
@@ -42,6 +46,27 @@ class Display:
             stderr=False,
         )
         self.verbose = verbose
+        self._log_file = None
+
+    def open_log(self, path: str) -> None:
+        """Open a log file for plain-text mirroring."""
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        self._log_file = open(path, "a")
+
+    def _log(self, message: str) -> None:
+        """Write a plain-text line to the log file."""
+        if not self._log_file:
+            return
+        ts = datetime.now().strftime("%H:%M:%S")
+        plain = _MARKUP_RE.sub("", message)
+        self._log_file.write(f"[{ts}] {plain}\n")
+        self._log_file.flush()
+
+    def close(self) -> None:
+        """Close the log file."""
+        if self._log_file:
+            self._log_file.close()
+            self._log_file = None
 
     def banner(self) -> None:
         """Startup banner."""
@@ -61,29 +86,35 @@ class Display:
         """Round divider with stage and runner info."""
         runner_label = f"({executor} / {model})" if model else f"({executor})"
         label = Text.assemble(
-            (f" Round {round_num} ", "round"),
+            ("─── ", "dim"),
+            (f"Round {round_num} ", "round"),
             ("| ", "dim"),
             (stage_name, "stage"),
             ("  ", ""),
             (runner_label, "runner"),
+            (" ", ""),
         )
         self.console.print()
-        self.console.print(Rule(label, style="dim"))
+        self.console.print(Rule(label, style="dim", align="right"))
+        self._log(f"--- Round {round_num} | {stage_name}  {runner_label} ---")
 
     def update(self, content: str) -> None:
         """Display an update signal."""
         ts = self._timestamp()
         self.console.print(f"  {ts} [signal.update]{content}[/]")
+        self._log(content)
 
     def domain_signal(self, name: str, content: str) -> None:
         """Display a domain signal (approved, rejected, etc.)."""
         ts = self._timestamp()
         self.console.print(f"  {ts} [signal.domain]<signal:{name}>[/] {content}")
+        self._log(f"<signal:{name}> {content}")
 
     def transition(self, from_stage: str, to_stage: str) -> None:
         """Display stage transition."""
         ts = self._timestamp()
         self.console.print(f"  {ts} [dim]{from_stage}[/] [transition]->[/] [stage]{to_stage}[/]")
+        self._log(f"{from_stage} -> {to_stage}")
 
     def error(self, message: str) -> None:
         """Display error."""
@@ -93,6 +124,7 @@ class Display:
             border_style="red",
             padding=(0, 1),
         ))
+        self._log(f"ERROR: {message}")
 
     def done(self, summary: str = "complete") -> None:
         """Display pipeline completion."""
@@ -103,16 +135,19 @@ class Display:
             border_style="green",
             padding=(0, 1),
         ))
+        self._log(f"DONE: {summary}")
 
     def info(self, message: str) -> None:
         """Display info line."""
         ts = self._timestamp()
         self.console.print(f"  {ts} {message}")
+        self._log(message)
 
     def warn(self, message: str) -> None:
         """Display warning."""
         ts = self._timestamp()
         self.console.print(f"  {ts} [yellow]{message}[/]")
+        self._log(f"WARN: {message}")
 
     def fallback(self, primary: str, fallback: str) -> None:
         """Display fallback runner activation."""
@@ -120,11 +155,16 @@ class Display:
         self.console.print(
             f"  {ts} [yellow]Fallback:[/] {primary} [dim]->[/] {fallback}"
         )
+        self._log(f"Fallback: {primary} -> {fallback}")
 
-    def executor_output(self, line: str) -> None:
-        """Stream executor output line."""
+    def executor_output(self, text: str) -> None:
+        """Stream executor output — always logged, terminal only in verbose."""
+        stripped = text.rstrip()
+        if not stripped:
+            return
         if self.verbose:
-            self.console.print(f"    [dim]{line.rstrip()}[/]")
+            self.console.print(f"    [dim]{stripped}[/]")
+        self._log(stripped)
 
     def _timestamp(self) -> str:
         now = datetime.now().strftime("%H:%M:%S")

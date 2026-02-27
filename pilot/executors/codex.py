@@ -19,7 +19,9 @@ class CodexExecutor:
     """
 
     def run(self, prompt: str, model: str | None = None,
-            known_signals: set[str] | None = None) -> ExecutorResult:
+            known_signals: set[str] | None = None,
+            on_output: callable = None,
+            on_signal: callable = None) -> ExecutorResult:
         effective_model = model or "o3"
         sandbox = "full-auto"
         if os.environ.get("PILOT_DOCKER") == "1":
@@ -51,10 +53,18 @@ class CodexExecutor:
         )
         stderr_thread.start()
 
-        stdout_content = ""
+        stdout_parts: list[str] = []
+        all_signals = []
         stdout_error = None
         try:
-            stdout_content = proc.stdout.read()
+            for line in proc.stdout:
+                stdout_parts.append(line)
+                if on_output:
+                    on_output(line)
+                for sig in parse_signals(line, known_signals):
+                    all_signals.append(sig)
+                    if on_signal:
+                        on_signal(sig)
         except KeyboardInterrupt:
             _kill_process_group(proc)
             raise
@@ -63,6 +73,8 @@ class CodexExecutor:
 
         stderr_thread.join()
         proc.wait()
+
+        stdout_content = "".join(stdout_parts)
 
         error = None
         if stderr_result["error"]:
@@ -74,8 +86,6 @@ class CodexExecutor:
             error = f"codex exited with code {proc.returncode}"
             if tail:
                 error += f"\nstderr: {tail}"
-
-        all_signals = parse_signals(stdout_content, known_signals)
 
         return ExecutorResult(
             output=stdout_content,
