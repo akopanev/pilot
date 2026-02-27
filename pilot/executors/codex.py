@@ -48,7 +48,7 @@ class CodexExecutor:
         stderr_result: dict = {"last_lines": [], "error": None}
         stderr_thread = threading.Thread(
             target=self._process_stderr,
-            args=(proc.stderr, stderr_result),
+            args=(proc.stderr, stderr_result, on_output),
             daemon=True,
         )
         stderr_thread.start()
@@ -95,8 +95,8 @@ class CodexExecutor:
         )
 
     @staticmethod
-    def _process_stderr(stream, result: dict) -> None:
-        """Read stderr for progress display. Captures last 5 lines for error context."""
+    def _process_stderr(stream, result: dict, on_output: callable = None) -> None:
+        """Read stderr for progress display and logging."""
         max_tail = 5
         tail: list[str] = []
 
@@ -106,6 +106,8 @@ class CodexExecutor:
                 if not stripped:
                     continue
                 stored = stripped[:256] + "..." if len(stripped) > 256 else stripped
+                if on_output:
+                    on_output(stored)
                 tail.append(stored)
                 if len(tail) > max_tail:
                     tail.pop(0)

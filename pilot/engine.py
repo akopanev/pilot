@@ -201,7 +201,7 @@ class PipelineEngine:
         if sig.name == "var" and "key" in sig.attrs:
             write_var(self.vars_path, sig.attrs["key"], sig.content)
             self.display.info(
-                f"[dim]var[/] {sig.attrs['key']}={sig.content}"
+                f"[dim]var {sig.attrs['key']}={sig.content}[/]"
             )
         elif sig.name == "update":
             self.display.update(sig.content)
