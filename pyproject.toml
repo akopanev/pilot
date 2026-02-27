@@ -23,6 +23,7 @@ include = ["pilot*"]
 [tool.setuptools.package-data]
 pilot = [
     "defaults/**/*",
+    "defaults/**/.*",
 ]
 
 [project.scripts]
