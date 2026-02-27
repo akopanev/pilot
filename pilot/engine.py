@@ -96,6 +96,8 @@ class PipelineEngine:
 
             if result.exit_code != 0:
                 consecutive_failures += 1
+                if result.error:
+                    self.display.warn(f"stderr: {result.error}")
                 self.display.warn(
                     f"Round failed, "
                     f"consecutive failures {consecutive_failures}/3"
@@ -110,24 +112,20 @@ class PipelineEngine:
             # Parse signals
             signals = result.signals or parse_signals(result.output, known)
 
-            # Built-in: var — persist to vars file
-            # Format: <signal:var key=NAME>value
+            # Process and display all signals
+            domain = None
             for s in signals:
                 if s.name == "var" and "key" in s.attrs:
                     write_var(self.vars_path, s.attrs["key"], s.content)
-
-            # Built-in: update — display progress
-            for s in signals:
-                if s.name == "update":
+                    self.display.info(
+                        f"[dim]var[/] {s.attrs['key']}={s.content}"
+                    )
+                elif s.name == "update":
                     self.display.update(s.content)
-
-            # Domain signal (first non-builtin)
-            domain = next(
-                (s for s in signals if s.name not in BUILTIN_SIGNALS),
-                None,
-            )
-            if domain:
-                self.display.domain_signal(domain.name, domain.content)
+                else:
+                    self.display.domain_signal(s.name, s.content)
+                    if domain is None:
+                        domain = s
 
             # Route
             if domain and domain.name in stage.on_signal:
