@@ -5,8 +5,18 @@ set -euo pipefail
 # Emits: <signal:ready>id</signal:ready> or <signal:completed>no tasks</signal:completed>
 # Uses: $PILOT_DEFAULT_BRANCH
 
+if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+  echo "<signal:failed>not a git repository</signal:failed>"
+  exit 0
+fi
+
 if ! command -v tk &>/dev/null; then
-  echo "<signal:failed>tk command not found — install ticket (https://github.com/wedow/ticket) or edit scripts/pick.sh</signal:failed>"
+  echo "<signal:failed>tk not found — install ticket (https://github.com/wedow/ticket)</signal:failed>"
+  exit 0
+fi
+
+if ! tk ls &>/dev/null; then
+  echo "<signal:failed>no .tickets/ directory — run 'tk create' to initialize</signal:failed>"
   exit 0
 fi
 
@@ -15,7 +25,7 @@ git checkout "$PILOT_DEFAULT_BRANCH" --quiet 2>/dev/null || true
 git pull --ff-only --quiet 2>/dev/null || true
 
 # Pick
-TASK=$(tk ready | head -n 1 || true)
+TASK=$(tk ready 2>/dev/null | head -n 1 || true)
 
 if [ -z "$TASK" ]; then
   echo "<signal:completed>no tasks</signal:completed>"
