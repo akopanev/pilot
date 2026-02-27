@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git nodejs npm ripgrep bash curl ca-certificates jq gosu \
+    git nodejs npm ripgrep bash curl ca-certificates jq gosu tini \
     && rm -rf /var/lib/apt/lists/*
 
 # Install CLI tools
@@ -32,5 +32,5 @@ ENV PILOT_DOCKER=1
 WORKDIR /workspace
 
 # Entrypoint runs as root, remaps UID, drops to pilot via gosu
-ENTRYPOINT ["/usr/local/bin/init-docker.sh"]
+ENTRYPOINT ["tini", "--", "/usr/local/bin/init-docker.sh"]
 CMD ["pilot", "run", ".pilot/pipeline.yaml"]
