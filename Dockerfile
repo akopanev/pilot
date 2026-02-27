@@ -10,6 +10,10 @@ RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
     && command -v claude >/dev/null \
     && command -v codex >/dev/null
 
+# Install ticket (tk) — git-backed issue tracker
+RUN curl -sSL https://raw.githubusercontent.com/wedow/ticket/master/ticket -o /usr/local/bin/tk \
+    && chmod +x /usr/local/bin/tk
+
 # Install Pilot
 COPY . /opt/pilot
 RUN pip install --no-cache-dir /opt/pilot && rm -rf /opt/pilot
