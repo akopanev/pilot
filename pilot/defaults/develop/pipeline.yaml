@@ -24,8 +24,8 @@ stages:
     prompt: |
       {{file:prompts/implement.md}}
     runner:
-      executor: codex
-      model: gpt-5.3-codex
+      executor: opencode
+      model: zai-coding-plan/glm-5
     fallback_runner:
       executor: claude-code
       model: sonnet
@@ -38,8 +38,8 @@ stages:
     prompt: |
       {{file:prompts/review.md}}
     runner:
-      executor: claude-code
-      model: opus
+      executor: codex
+      model: gpt-5.3-codex
     on_signal:
       approved: merge       # pass — squash merge
       rejected: fix         # fail — send back for fixes
