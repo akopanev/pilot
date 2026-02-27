@@ -1,264 +1,142 @@
 # PILOT
 
-Config-driven pipeline engine for AI agents. Define stages, transitions, and runners in YAML — the engine handles the state machine.
-
-## Install
-
-```bash
-# One-line install (from private repo)
-curl -sSL https://raw.githubusercontent.com/akopanev/pilot/master/install.sh | bash
-
-# Or from a local checkout
-PILOT_REPO=/path/to/pilot bash install.sh
-```
-
-Requires Python 3.11+. Installs to `~/.pilot/` with wrappers at `~/.local/bin/pilot` and `~/.local/bin/pilot-docker`.
+Config-driven state machine for AI agent workflows. Define stages, signals, and transitions in YAML — the engine runs the graph.
 
 ## Quick Start
 
 ```bash
+# Install (Python 3.11+)
+curl -sSL https://raw.githubusercontent.com/akopanev/pilot/master/install.sh | bash
+
 # Scaffold .pilot/ in your project
-cd your-project
-pilot init
+cd your-project && pilot init
 
-# Preview the pipeline
-pilot run .pilot/pipeline.yaml --dry-run
-
-# Run the pipeline
+# Run
 pilot run .pilot/pipeline.yaml
 ```
 
-`pilot init` creates:
-
-```
-.pilot/
-├── pipeline.yaml           # pipeline config
-├── prompts/                # prompt templates
-│   ├── implement.md
-│   ├── review.md
-│   └── fix.md
-└── scripts/                # shell stages
-    ├── pick.sh
-    └── merge.sh
-```
-
-Runtime state (gitignored):
-
-```
-.pilot/
-├── state                   # current stage (crash recovery)
-├── vars                    # persistent key-value pairs
-└── logs/                   # real-time session logs
-```
-
-## Docker
-
-Run in a hermetic container with all tools pre-installed (claude-code, codex, opencode).
-
-```bash
-# Run from any project directory — image auto-builds on first use
-cd ~/my-project
-pilot-docker run .pilot/pipeline.yaml --dry-run
-pilot-docker run .pilot/pipeline.yaml
-
-# Force rebuild after pilot source changes
-pilot-docker --build run .pilot/pipeline.yaml
-
-# With API keys instead of CLI auth
-ANTHROPIC_API_KEY=sk-... pilot-docker run .pilot/pipeline.yaml
-ZHIPU_API_KEY=... pilot-docker run .pilot/pipeline.yaml
-```
-
-The `pilot-docker` wrapper:
-- Auto-builds the image on first use
-- Mounts `$(pwd)` as `/workspace`
-- Extracts Claude credentials from macOS Keychain
-- Forwards codex/opencode/git config read-only
-- Forwards API keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ZHIPU_API_KEY`)
-- Sets OpenCode permissions to allow-all (no interactive prompts)
-- Matches host UID for correct file ownership
-- Uses `tini` as init process for proper signal handling (Ctrl+C)
-
----
-
 ## How It Works
 
-PILOT is a state machine. Each **stage** runs an executor (shell script or AI agent), parses **signals** from the output, and transitions to the next stage based on the config.
+Stages are nodes. Signals are edges. The engine loops:
+
+**run stage → parse signals → follow edge → next stage**
 
 ```
-pick ──ready──> implement ──> review ──approved──> merge ──> pick
-                                 │
-                              rejected
-                                 │
-                                fix ──────> review
+         ┌─────────────────────────────────────┐
+         ▼                                     │
+       pick ──ready──▶ implement ──▶ review ──approved──▶ merge
+         ▲                             │
+         │                          rejected
+     completed                         │
+         │                             ▼
+       (exit)                         fix ───────▶ review
 ```
 
-The agent doesn't decide routing — the config does.
+No stage is special. Any stage can point to any other stage — loops, branches, convergence are all just config. Agents emit signals; they don't decide routing.
 
-## Pipeline Config
+## Config
 
 ```yaml
 version: "0.1"
-starting: pick                # entry point (uses first stage if omitted)
+starting: pick
 
-vars:                         # exported as env vars every round
+vars:
   PILOT_DEFAULT_BRANCH: master
 
 stages:
   pick:
     runner:
-      executor: shell         # shell stages use command:
-      command: |
-        {{file:scripts/pick.sh}}
+      executor: shell
+      command: "{{file:scripts/pick.sh}}"
     on_signal:
-      ready: implement        # signal → next stage
-      completed: __exit__     # stop pipeline
-      failed: __exit__        # error → stop pipeline
-      default: pick           # no signal → retry
+      ready: implement
+      completed: __exit__
+      default: pick
 
   implement:
-    prompt: |                 # AI stages use prompt:
-      {{file:prompts/implement.md}}
-    runner:
-      executor: codex
-      model: o3
-    fallback_runner:          # fallback if primary fails (2 retries each)
-      executor: claude-code
-      model: sonnet
+    prompt: "{{file:prompts/implement.md}}"
+    runner: { executor: codex, model: o3 }
+    fallback_runner: { executor: claude-code, model: sonnet }
     on_signal:
-      failed: __exit__
+      default: review
+
+  review:
+    prompt: "{{file:prompts/review.md}}"
+    runner: { executor: claude-code, model: opus }
+    on_signal:
+      approved: merge
+      rejected: fix
       default: review
 ```
 
 ### Stages
 
-Named steps. `starting:` sets the entry point (defaults to first stage if omitted). On crash recovery, the engine resumes from the saved state, not `starting:`.
+Named nodes in the graph. `starting:` sets the entry point (defaults to first stage). On crash, the engine resumes from the persisted stage.
 
 ### Runners
 
-Executors that run each stage:
+| Executor | Description |
+|----------|-------------|
+| `shell` | Shell scripts/commands (uses `command:`) |
+| `claude-code` | Claude Code (`--dangerously-skip-permissions`) |
+| `codex` | OpenAI Codex (`--sandbox full-auto`) |
+| `opencode` | OpenCode (`-m provider/model`) |
+| anything else | Generic CLI (`<tool> --model M -p PROMPT`) |
 
-| Executor | Mode | Description |
-|----------|------|-------------|
-| `shell` | command | Run shell scripts/commands |
-| `claude-code` | AI | Claude Code (`--dangerously-skip-permissions`, JSON stream) |
-| `codex` | AI | OpenAI Codex CLI (`--sandbox full-auto`) |
-| `opencode` | AI | OpenCode (`-m provider/model`, permissions via config) |
-| anything else | AI | Generic CLI tool (`<tool> --model M -p PROMPT`) |
+Each stage has a `runner` and optional `fallback_runner`. Primary retries twice, then fallback retries twice. Three consecutive round failures stop the pipeline.
 
 ### Signals
 
-Structured output from agents/scripts — XML tags in stdout/stderr:
+Agents and scripts emit signals as XML tags in their output:
 
 ```xml
 <signal:ready>tk-5c46</signal:ready>
 <signal:approved>all checks pass</signal:approved>
-<signal:var key=PILOT_TASK_ID>tk-5c46</signal:var>
-<signal:update>running tests...</signal:update>
-<signal:failed>build error</signal:failed>
+<signal:rejected>tests failing</signal:rejected>
 ```
 
-Built-in signals (handled by engine, don't affect routing):
-- `update` — progress display (shown in real-time)
-- `var` — persist key-value pair to `.pilot/vars`
+The engine matches the first domain signal against `on_signal:` to route. `default` catches rounds with no signal. `__exit__` stops the pipeline.
 
-Domain signals (`ready`, `approved`, `rejected`, `failed`, etc.) are config-defined per stage via `on_signal`. Displayed in real-time as they stream from the executor.
+**Built-in signals** (not routed):
+- `update` — real-time progress display
+- `var` — persist a key-value pair: `<signal:var key=NAME>value</signal:var>`
 
-### Transitions
+### Templates
 
-Signal-to-stage mapping in `on_signal:`:
-- `ready: implement` — go to implement on `ready` signal
-- `completed: __exit__` — stop the pipeline
-- `default: pick` — fallback when no domain signal is emitted
+Prompts and commands support two template types, resolved fresh each round:
 
-### Templates & Prompt Building
-
-Before each round, the engine builds the prompt by resolving templates in `prompt:` (AI stages) or `command:` (shell stages).
-
-Two template types:
-
-**`{{file:path}}`** — inline file contents, relative to `.pilot/` directory:
-```yaml
-prompt: |
-  {{file:prompts/implement.md}}
-```
-Files can reference other files (recursive, max depth 10). This keeps prompts DRY — shared context referenced, not duplicated.
-
-**`{{var:NAME}}`** — inline a var value from `.pilot/vars`:
-```markdown
-Task: {{var:PILOT_TASK_ID}}
-Branch: {{var:PILOT_WORKING_BRANCH}}
-```
-Resolved fresh each round, so vars set by earlier stages are available to later ones.
+- **`{{file:path}}`** — inline file contents (relative to `.pilot/`, recursive)
+- **`{{var:NAME}}`** — inline a var from `.pilot/vars`
 
 ### Vars
 
-Persistent key-value pairs in `.pilot/vars`, exported as **env vars** every round and available as **`{{var:NAME}}`** in templates.
+Key-value pairs persisted in `.pilot/vars`. Available as `{{var:NAME}}` in templates and as `$NAME` env vars in shell stages.
 
-```
-PILOT_DEFAULT_BRANCH=master
-PILOT_TASK_ID=nw-5c46
-PILOT_WORKING_BRANCH=feat/nw-5c46
-```
+Set from three places: `vars:` in config, `<signal:var>` from agents, or direct file edit. Cleaned on pipeline exit.
 
-**Three sources:**
+## Docker
 
-1. **`vars:` in pipeline.yaml** — config defaults, written every round
-2. **`<signal:var key=NAME>value</signal:var>`** — emitted by agents/scripts at runtime
-3. **Direct file edit** — shell scripts can write to `.pilot/vars` directly
-
-**Flow example (vars + state file):**
-```
-Round 1 (pick):
-  .pilot/state → pick
-  1. Engine writes config vars to .pilot/vars   → PILOT_DEFAULT_BRANCH=master
-  2. Engine exports vars as env vars            → $PILOT_DEFAULT_BRANCH in shell
-  3. pick.sh runs, emits:
-       <signal:var key=PILOT_TASK_ID>nw-5c46</signal:var>
-       <signal:var key=PILOT_WORKING_BRANCH>feat/nw-5c46</signal:var>
-       <signal:ready>nw-5c46</signal:ready>
-  4. Engine writes vars to .pilot/vars
-  5. Engine routes: ready → implement
-  .pilot/state → implement
-
-Round 2 (implement):
-  .pilot/state → implement
-  1. Engine exports all vars as env vars
-  2. Engine resolves templates in prompt:
-       {{var:PILOT_TASK_ID}}          → "nw-5c46"
-       {{var:PILOT_WORKING_BRANCH}}   → "feat/nw-5c46"
-  3. Resolved prompt sent to executor
-  4. No domain signal → default → review
-  .pilot/state → review
-
-Pipeline exit (__exit__):
-  .pilot/state → deleted
-  .pilot/vars  → deleted
+```bash
+pilot-docker run .pilot/pipeline.yaml
+pilot-docker --build run .pilot/pipeline.yaml    # rebuild image
+ANTHROPIC_API_KEY=sk-... pilot-docker run .pilot/pipeline.yaml
 ```
 
-Vars available two ways:
-- **`{{var:NAME}}`** in prompts — resolved by engine before sending to executor
-- **`$NAME`** as env vars — available in shell scripts
+Hermetic container with claude-code, codex, opencode pre-installed. Auto-builds image, mounts workspace, forwards credentials (Keychain, API keys, configs), matches host UID.
 
-All vars and state cleaned on `__exit__`.
+## Customization
 
-### Retry & Fallback
+**Stages** — add/remove/rewire stages in `pipeline.yaml`. Any graph topology works.
 
-Engine behavior (not in config): primary runner retries twice, then fallback runner retries twice. If all 4 attempts fail, the round fails. Three consecutive round failures stop the pipeline.
+**Runners** — swap executor and model per stage. Mix shell scripts with different AI providers in one pipeline.
 
-### Timing
+**Prompts** — edit `prompts/*.md`. Use `{{file:context/project.md}}` to inject project-specific context without duplicating it across prompts.
 
-Each round displays its duration after completion. On pipeline exit, total rounds and elapsed time are shown.
+**Tracker** — the engine is tracker-agnostic. The default template uses [ticket](https://github.com/wedow/ticket) (`tk`). Replace commands in `scripts/pick.sh` and `scripts/merge.sh` for any other tracker.
 
-## Persistence
+**New pipelines** — `pipeline.yaml` is not limited to dev workflows. Define any stage graph: CI, deploy, content review, data processing — anything that benefits from signal-driven routing between AI/shell steps.
 
-**State** (`.pilot/state`) — current stage name. Survives crashes — the engine resumes where it left off. Cleaned on `__exit__`.
-
-**Vars** (`.pilot/vars`) — see [Vars](#vars) above. Survives crashes. Cleaned on `__exit__`.
-
-**Logs** (`.pilot/logs/`) — real-time session logs with timestamps. One file per run (`pilot-{timestamp}.log`). Everything logged: executor output, signals, transitions, errors.
-
-## Commands
+## CLI
 
 ```
 pilot run <pipeline.yaml>              Run the pipeline
@@ -268,29 +146,10 @@ pilot validate <pipeline.yaml>         Validate config
 pilot init                             Scaffold .pilot/ with default dev pipeline
 ```
 
-## Project Structure
+## Persistence
 
-```
-pilot/                    # Python package (source)
-  cli.py                  CLI entry point
-  config.py               YAML loading + validation
-  models.py               Stage, Runner, Transition, PipelineConfig
-  engine.py               State machine loop (retry, fallback, signals, timing)
-  signals.py              <signal:NAME> parser (XML with attrs)
-  templates.py            {{file:path}} and {{var:NAME}} resolution
-  state.py                .pilot/state read/write
-  vars.py                 .pilot/vars read/write/export
-  display.py              Terminal output (rich), real-time log file
-  executors/
-    shell.py              Shell command executor
-    claude.py             Claude Code (JSON stream)
-    codex.py              Codex CLI (stderr/stdout split)
-    opencode.py           OpenCode (-m provider/model)
-    generic.py            Generic CLI tool
-  defaults/
-    develop/              Shipped dev pipeline template
-scripts/
-  pilot-docker            Docker wrapper with credential forwarding
-  init-docker.sh          Container entrypoint (UID remap, credentials, permissions)
-Dockerfile                Python + node + CLI tools + tini
-```
+| File | Purpose | Crash-safe | Cleaned on exit |
+|------|---------|------------|-----------------|
+| `.pilot/state` | Current stage | Yes | Yes |
+| `.pilot/vars` | Key-value pairs | Yes | Yes |
+| `.pilot/logs/` | Session logs (timestamped) | — | No |
