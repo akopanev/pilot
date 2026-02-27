@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git nodejs npm ripgrep bash curl ca-certificates jq \
+    git nodejs npm ripgrep bash curl ca-certificates jq gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Install CLI tools
@@ -18,18 +18,18 @@ RUN curl -sSL https://raw.githubusercontent.com/wedow/ticket/master/ticket -o /u
 COPY . /opt/pilot
 RUN pip install --no-cache-dir /opt/pilot && rm -rf /opt/pilot
 
-# Init script (credential copy from read-only mounts)
+# Init script (UID mapping + credential forwarding)
 COPY scripts/init-docker.sh /usr/local/bin/init-docker.sh
 RUN chmod +x /usr/local/bin/init-docker.sh
 
-# Non-root user
-ARG USER_UID=1000
-RUN useradd -m -u ${USER_UID} -s /bin/bash pilot
-USER pilot
+# Non-root user (UID remapped at runtime via APP_UID)
+RUN useradd -m -s /bin/bash pilot
 
 # Docker marker
 ENV PILOT_DOCKER=1
 
 WORKDIR /workspace
+
+# Entrypoint runs as root, remaps UID, drops to pilot via gosu
 ENTRYPOINT ["/usr/local/bin/init-docker.sh"]
 CMD ["pilot", "run", ".pilot/pipeline.yaml"]

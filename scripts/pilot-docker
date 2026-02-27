@@ -42,9 +42,8 @@ def ensure_image(image: str, build: bool) -> int:
         print(f"image '{image}' not found, building from {PILOT_SRC}...", file=sys.stderr)
 
     print(f"building image '{image}' from {PILOT_SRC}...", file=sys.stderr)
-    uid_arg = str(os.getuid())
     rc = subprocess.run(
-        ["docker", "build", "--build-arg", f"USER_UID={uid_arg}", "-t", image, str(PILOT_SRC)],
+        ["docker", "build", "-t", image, str(PILOT_SRC)],
         check=False,
     ).returncode
     if rc != 0:
