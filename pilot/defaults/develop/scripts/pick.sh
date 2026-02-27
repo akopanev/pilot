@@ -21,7 +21,9 @@ if ! tk ls &>/dev/null; then
 fi
 
 # Dirty working tree = trouble (exclude .pilot/ runtime files)
-if [ -n "$(git status --porcelain -- . ':!.pilot/state' ':!.pilot/vars' ':!.pilot/logs')" ]; then
+DIRTY=$(git status --porcelain -- . ':!.pilot/state' ':!.pilot/vars' ':!.pilot/logs' 2>&1)
+if [ -n "$DIRTY" ]; then
+  echo "<signal:update>dirty: $DIRTY</signal:update>"
   echo "<signal:failed>uncommitted changes — commit or stash before running pilot</signal:failed>"
   exit 0
 fi
