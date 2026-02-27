@@ -85,7 +85,11 @@ class Display:
                      executor: str, model: str | None) -> None:
         """Round divider with stage and runner info."""
         runner_label = f"({executor} / {model})" if model else f"({executor})"
-        label = Text.assemble(
+        # Build left-aligned header: ─── Round N | stage  (runner) ────────
+        title = f"Round {round_num} | {stage_name}  {runner_label}"
+        width = self.console.width or 80
+        pad = max(4, width - len(title) - 5)  # 5 = "─── " + " "
+        line = Text.assemble(
             ("─── ", "dim"),
             (f"Round {round_num} ", "round"),
             ("| ", "dim"),
@@ -93,9 +97,10 @@ class Display:
             ("  ", ""),
             (runner_label, "runner"),
             (" ", ""),
+            ("─" * pad, "dim"),
         )
         self.console.print()
-        self.console.print(Rule(label, style="dim", align="right"))
+        self.console.print(line)
         self._log(f"--- Round {round_num} | {stage_name}  {runner_label} ---")
 
     def update(self, content: str) -> None:
