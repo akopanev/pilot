@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 
 from pilot.display import Display
 from pilot.executors import ExecutorPool
@@ -62,12 +63,22 @@ class PipelineEngine:
 
         export_vars(self.vars_path)
 
+    @staticmethod
+    def _fmt_duration(seconds: int) -> str:
+        if seconds >= 3600:
+            return f"{seconds // 3600}h{(seconds % 3600) // 60:02d}m"
+        if seconds >= 60:
+            return f"{seconds // 60}m{seconds % 60:02d}s"
+        return f"{seconds}s"
+
     def run(self) -> None:
         consecutive_failures = 0
         round_num = 0
+        pipeline_start = time.monotonic()
 
         while not self.cancel.is_set():
             round_num += 1
+            round_start = time.monotonic()
             self._sync_env()
 
             stage = self.config.stages.get(self.state.stage)
@@ -92,6 +103,8 @@ class PipelineEngine:
 
             # Run executor with retries, then fallback with retries
             result = self._run_with_retries(stage, prompt, known)
+            elapsed = int(time.monotonic() - round_start)
+            self.display.info(f"[dim]round {round_num} · {self._fmt_duration(elapsed)}[/]")
 
             if result.exit_code != 0:
                 consecutive_failures += 1
@@ -126,7 +139,9 @@ class PipelineEngine:
 
             # Transition
             if transition.to is None:
-                self.display.done(domain.content if domain else "complete")
+                total = int(time.monotonic() - pipeline_start)
+                summary = domain.content if domain else "complete"
+                self.display.done(f"{summary} ({round_num} rounds, {self._fmt_duration(total)})")
                 clear_state(self.state_path)
                 clear_vars(self.vars_path)
                 break
