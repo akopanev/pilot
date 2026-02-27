@@ -1,8 +1,9 @@
-FROM python:3.12-slim
+FROM node:22-slim
 
-# System deps
+# System deps (node/npm/corepack already in base image)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git nodejs npm ripgrep bash curl ca-certificates jq gosu \
+    git python3 python3-pip python3-venv \
+    ripgrep bash curl ca-certificates jq gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Enable corepack (pnpm/yarn available without separate install)
@@ -20,7 +21,10 @@ ENV PATH="/opt/ticket/plugins:${PATH}"
 
 # Install Pilot
 COPY . /opt/pilot
-RUN pip install --no-cache-dir /opt/pilot && rm -rf /opt/pilot
+RUN python3 -m venv /opt/pilot-venv \
+    && /opt/pilot-venv/bin/pip install --no-cache-dir /opt/pilot \
+    && rm -rf /opt/pilot
+ENV PATH="/opt/pilot-venv/bin:${PATH}"
 
 # Init script (UID mapping + credential forwarding)
 COPY scripts/init-docker.sh /usr/local/bin/init-docker.sh
