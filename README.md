@@ -46,7 +46,7 @@ Runtime state (gitignored):
 
 ```
 .pilot/
-├── state                   # current stage + round (crash recovery)
+├── state                   # current stage (crash recovery)
 └── vars                    # persistent key-value pairs
 ```
 
@@ -205,7 +205,7 @@ PILOT_WORKING_BRANCH=feat/nw-5c46
 **Flow example (vars + state file):**
 ```
 Round 1 (pick):
-  .pilot/state → pick 1
+  .pilot/state → pick
   1. Engine writes config vars to .pilot/vars   → PILOT_DEFAULT_BRANCH=master
   2. Engine exports vars as env vars            → $PILOT_DEFAULT_BRANCH in shell
   3. pick.sh runs, emits:
@@ -214,17 +214,17 @@ Round 1 (pick):
        <signal:ready>nw-5c46</signal:ready>
   4. Engine writes vars to .pilot/vars
   5. Engine routes: ready → implement
-  .pilot/state → implement 1
+  .pilot/state → implement
 
 Round 2 (implement):
-  .pilot/state → implement 2
+  .pilot/state → implement
   1. Engine exports all vars as env vars
   2. Engine resolves templates in prompt:
        {{var:PILOT_TASK_ID}}          → "nw-5c46"
        {{var:PILOT_WORKING_BRANCH}}   → "feat/nw-5c46"
   3. Resolved prompt sent to executor
   4. No domain signal → default → review
-  .pilot/state → review 2
+  .pilot/state → review
 
 Pipeline exit (__exit__):
   .pilot/state → deleted
@@ -243,7 +243,7 @@ Engine behavior (not in config): primary runner retries twice, then fallback run
 
 ## Persistence
 
-**State** (`.pilot/state`) — current stage and round number. Survives crashes — the engine resumes where it left off. Cleaned on `__exit__`.
+**State** (`.pilot/state`) — current stage name. Survives crashes — the engine resumes where it left off. Cleaned on `__exit__`.
 
 **Vars** (`.pilot/vars`) — see [Vars](#vars) above. Survives crashes. Cleaned on `__exit__`.
 

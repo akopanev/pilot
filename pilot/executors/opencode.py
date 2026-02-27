@@ -11,18 +11,18 @@ from pilot.executors.result import ExecutorResult
 
 
 class OpenCodeExecutor:
-    """Runs opencode CLI in non-interactive dangerous mode.
+    """Runs opencode CLI.
 
-    Command: opencode run --dangerously-skip-permissions [--model MODEL] PROMPT
+    Command: opencode run [-m MODEL] PROMPT
     """
 
     def run(self, prompt: str, model: str | None = None,
             known_signals: set[str] | None = None,
             on_output: callable = None,
             on_signal: callable = None) -> ExecutorResult:
-        cmd = ["opencode", "run", "--dangerously-skip-permissions"]
+        cmd = ["opencode", "run"]
         if model:
-            cmd.extend(["--model", model])
+            cmd.extend(["-m", model])
         cmd.append(prompt)
 
         proc = subprocess.Popen(

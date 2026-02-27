@@ -53,12 +53,17 @@ if [ -d /mnt/codex ]; then
     chown -R pilot:pilot /home/pilot/.codex
 fi
 
-# OpenCode auth
+# OpenCode auth + config
 if [ -f /mnt/opencode-auth.json ]; then
-    mkdir -p /home/pilot/.opencode
-    cp /mnt/opencode-auth.json /home/pilot/.opencode/auth.json
-    chown -R pilot:pilot /home/pilot/.opencode
-    chmod 600 /home/pilot/.opencode/auth.json
+    mkdir -p /home/pilot/.local/share/opencode
+    cp /mnt/opencode-auth.json /home/pilot/.local/share/opencode/auth.json
+    chmod 600 /home/pilot/.local/share/opencode/auth.json
 fi
+# OpenCode: allow all permissions (no interactive prompts)
+mkdir -p /home/pilot/.config/opencode
+cat > /home/pilot/.config/opencode/opencode.json <<'OCEOF'
+{"permission":{"*":"allow"}}
+OCEOF
+chown -R pilot:pilot /home/pilot/.config/opencode /home/pilot/.local/share/opencode 2>/dev/null || true
 
 exec gosu pilot "$@"

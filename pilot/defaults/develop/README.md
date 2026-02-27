@@ -52,7 +52,7 @@ Vars live in `.pilot/vars` — persisted across rounds, cleaned on pipeline exit
 
 ```
 Round 1 — pick
-  state: pick 1                          ← .pilot/state
+  state: pick                            ← .pilot/state
   vars:  PILOT_DEFAULT_BRANCH=master     ← from pipeline.yaml
   ── pick.sh runs ──
   pick.sh emits:
@@ -64,16 +64,16 @@ Round 1 — pick
     PILOT_TASK_ID=nw-5c46
     PILOT_WORKING_BRANCH=feat/nw-5c46
   engine routes: ready → implement
-  state: implement 1                     ← .pilot/state updated
+  state: implement                       ← .pilot/state updated
 
 Round 2 — implement
-  state: implement 2
+  state: implement
   engine resolves prompt templates:
     {{var:PILOT_TASK_ID}}         → "nw-5c46"
     {{var:PILOT_WORKING_BRANCH}}  → "feat/nw-5c46"
   ── codex runs with resolved prompt ──
   no domain signal → default → review
-  state: review 2
+  state: review
 
 Round 3 — review
   engine resolves prompt templates:
@@ -82,13 +82,13 @@ Round 3 — review
     {{var:PILOT_DEFAULT_BRANCH}}    → "master"
   ── claude-code runs ──
   emits <signal:approved> → merge
-  state: merge 3
+  state: merge
 
 Round 4 — merge
   merge.sh uses env vars: $PILOT_WORKING_BRANCH, $PILOT_DEFAULT_BRANCH, $PILOT_TASK_ID
   ── squash merge, delete branch, close ticket ──
   default → pick
-  state: pick 4
+  state: pick
 
   ... next task or <signal:completed> → __exit__ (cleans state + vars)
 ```
