@@ -25,12 +25,15 @@ class ShellExecutor:
         )
 
         output = proc.stdout
-        if on_output and output:
-            on_output(output)
         signals = parse_signals(output, known_signals)
         if on_signal:
             for sig in signals:
                 on_signal(sig)
+        # Log non-signal lines only (signals already displayed via on_signal)
+        if on_output and output:
+            for line in output.splitlines():
+                if line.strip() and "<signal:" not in line:
+                    on_output(line)
 
         return ExecutorResult(
             output=output,

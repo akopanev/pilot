@@ -20,8 +20,8 @@ if ! tk ls &>/dev/null; then
   exit 0
 fi
 
-# Dirty working tree = trouble
-if [ -n "$(git status --porcelain)" ]; then
+# Dirty working tree = trouble (exclude .pilot/ runtime files)
+if [ -n "$(git status --porcelain -- . ':!.pilot/state' ':!.pilot/vars' ':!.pilot/logs')" ]; then
   echo "<signal:failed>uncommitted changes — commit or stash before running pilot</signal:failed>"
   exit 0
 fi
