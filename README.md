@@ -22,14 +22,11 @@ Stages are nodes. Signals are edges. The engine loops:
 **run stage → parse signals → follow edge → next stage**
 
 ```
-         ┌─────────────────────────────────────┐
-         ▼                                     │
-       pick ──ready──▶ implement ──▶ review ──approved──▶ merge
-         ▲                             │
-         │                          rejected
-     completed                         │
-         │                             ▼
-       (exit)                         fix ───────▶ review
+       pick ──ready──▶ implement ──▶ review ──approved──▶ merge ──▶ pick
+         │                             │
+     completed                      rejected
+         │                             │
+       (exit)                         fix ──────────────▶ review
 ```
 
 No stage is special. Any stage can point to any other stage — loops, branches, convergence are all just config. Agents emit signals; they don't decide routing.
