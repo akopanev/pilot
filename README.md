@@ -11,9 +11,14 @@ curl -sSL https://raw.githubusercontent.com/akopanev/pilot/master/install.sh | b
 # Scaffold .pilot/ in your project
 cd your-project && pilot init
 
-# Run
+# Run locally
 pilot run .pilot/pipeline.yaml
+
+# Run in Docker (claude-code, codex, opencode pre-installed)
+pilot-docker run .pilot/pipeline.yaml
 ```
+
+Installs `pilot` and `pilot-docker` to `~/.local/bin/`.
 
 ## How It Works
 
