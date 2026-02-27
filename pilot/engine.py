@@ -96,8 +96,6 @@ class PipelineEngine:
 
             if result.exit_code != 0:
                 consecutive_failures += 1
-                if result.error:
-                    self.display.warn(f"stderr: {result.error}")
                 self.display.warn(
                     f"Round failed, "
                     f"consecutive failures {consecutive_failures}/3"
@@ -170,21 +168,21 @@ class PipelineEngine:
                 if result.exit_code == 0:
                     return result
 
-                tag = f"{runner.executor}/{runner.model}"
+                tag = f"{runner.executor}/{runner.model}" if runner.model else runner.executor
                 self.display.warn(
-                    f"{label} {tag} failed "
+                    f"{tag} failed "
                     f"(attempt {attempt}/2, exit {result.exit_code})"
                 )
+                if result.error:
+                    self.display.warn(f"stderr: {result.error}")
                 if attempt < 2:
                     self._wait()
 
             # Switch to fallback
             if label == "primary" and stage.fallback_runner:
                 fb = stage.fallback_runner
-                self.display.fallback(
-                    f"{runner.executor}/{runner.model}",
-                    f"{fb.executor}/{fb.model}",
-                )
+                fb_tag = f"{fb.executor}/{fb.model}" if fb.model else fb.executor
+                self.display.fallback(tag, fb_tag)
 
         return result
 
