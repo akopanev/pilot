@@ -141,7 +141,7 @@ class PipelineEngine:
             if transition.to is None:
                 total = int(time.monotonic() - pipeline_start)
                 summary = domain.content if domain else "complete"
-                self.display.done(f"{summary} ({round_num} rounds, {self._fmt_duration(total)})")
+                self.display.done(summary, f"{round_num} rounds, {self._fmt_duration(total)}")
                 clear_state(self.state_path)
                 clear_vars(self.vars_path)
                 break

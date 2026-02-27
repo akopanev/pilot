@@ -116,7 +116,7 @@ class Display:
     def transition(self, from_stage: str, to_stage: str) -> None:
         """Display stage transition."""
         ts = self._timestamp()
-        self.console.print(f"  {ts} [dim]{from_stage} ->[/] [stage]{to_stage}[/]")
+        self.console.print(f"  {ts} [dim]{from_stage} ->[/] [stage]{to_stage}[/]", highlight=False)
         self._log(f"{from_stage} -> {to_stage}")
 
     def error(self, message: str) -> None:
@@ -129,16 +129,20 @@ class Display:
         ))
         self._log(f"ERROR: {message}")
 
-    def done(self, summary: str = "complete") -> None:
+    def done(self, summary: str = "complete", stats: str = "") -> None:
         """Display pipeline completion."""
         self.console.print()
+        body = summary
+        if stats:
+            body = f"{summary} [dim]({stats})[/]"
         self.console.print(Panel(
-            summary,
+            body,
             title="[success]Done[/]",
             border_style="green",
             padding=(0, 1),
         ))
-        self._log(f"DONE: {summary}")
+        plain = f"{summary} ({stats})" if stats else summary
+        self._log(f"DONE: {plain}")
 
     def info(self, message: str) -> None:
         """Display info line."""

@@ -47,8 +47,10 @@ git commit -m "$TASK: start" --quiet
 BRANCH="feat/$TASK"
 git checkout -B "$BRANCH"
 
-REMAINING=$(tk ls 2>/dev/null | wc -l | tr -d ' ')
-echo "<signal:update>$REMAINING task(s) remaining</signal:update>"
+OPEN=$(tk ls 2>/dev/null | wc -l | tr -d ' ')
+CLOSED=$(tk ls --status closed 2>/dev/null | wc -l | tr -d ' ')
+TOTAL=$((OPEN + CLOSED))
+echo "<signal:update>$OPEN / $TOTAL tasks remaining</signal:update>"
 echo "<signal:var key=PILOT_TASK_ID>$TASK</signal:var>"
 echo "<signal:var key=PILOT_WORKING_BRANCH>$BRANCH</signal:var>"
 echo "<signal:ready>$TASK</signal:ready>"
