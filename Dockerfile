@@ -10,9 +10,9 @@ RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
     && command -v claude >/dev/null \
     && command -v codex >/dev/null
 
-# Install ticket (tk) — git-backed issue tracker
-RUN curl -sSL https://raw.githubusercontent.com/wedow/ticket/master/ticket -o /usr/local/bin/tk \
-    && chmod +x /usr/local/bin/tk
+# Install ticket (tk) — git-backed issue tracker (full clone for plugins)
+RUN git clone --depth 1 https://github.com/wedow/ticket.git /opt/ticket \
+    && ln -s /opt/ticket/ticket /usr/local/bin/tk
 
 # Install Pilot
 COPY . /opt/pilot
