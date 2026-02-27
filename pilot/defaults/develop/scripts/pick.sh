@@ -20,6 +20,12 @@ if ! tk ls &>/dev/null; then
   exit 0
 fi
 
+# Dirty working tree = trouble
+if [ -n "$(git status --porcelain)" ]; then
+  echo "<signal:failed>uncommitted changes — commit or stash before running pilot</signal:failed>"
+  exit 0
+fi
+
 # Clean slate
 git checkout "$PILOT_DEFAULT_BRANCH" --quiet 2>/dev/null || true
 git pull --ff-only --quiet 2>/dev/null || true
