@@ -20,16 +20,14 @@ _MARKUP_RE = re.compile(r"\[/?[^\]]*\]")
 
 PILOT_THEME = Theme({
     "stage": "bold cyan",
-    "signal": "bold blue",
     "signal.update": "dim",
     "signal.failed": "bold red",
-    "signal.domain": "bold green",
-    "transition": "bold yellow",
+    "signal.domain": "bold",
     "runner": "dim",
     "timestamp": "dim",
     "error": "bold red",
     "success": "bold green",
-    "round": "bold magenta",
+    "round": "bold",
 })
 
 
@@ -77,7 +75,7 @@ class Display:
         )
         self.console.print(Panel(
             title,
-            border_style="cyan",
+            border_style="dim",
             padding=(0, 2),
         ))
 
@@ -106,19 +104,19 @@ class Display:
     def update(self, content: str) -> None:
         """Display an update signal."""
         ts = self._timestamp()
-        self.console.print(f"  {ts} [signal.update]{content}[/]")
+        self.console.print(f"  {ts} [signal.update]{content}[/]", highlight=False)
         self._log(content)
 
     def domain_signal(self, name: str, content: str) -> None:
         """Display a domain signal (approved, rejected, etc.)."""
         ts = self._timestamp()
-        self.console.print(f"  {ts} [signal.domain]<signal:{name}>[/] {content}")
+        self.console.print(f"  {ts} [signal.domain]{name}:[/] {content}", highlight=False)
         self._log(f"<signal:{name}> {content}")
 
     def transition(self, from_stage: str, to_stage: str) -> None:
         """Display stage transition."""
         ts = self._timestamp()
-        self.console.print(f"  {ts} [dim]{from_stage}[/] [transition]->[/] [stage]{to_stage}[/]")
+        self.console.print(f"  {ts} [dim]{from_stage} ->[/] [stage]{to_stage}[/]")
         self._log(f"{from_stage} -> {to_stage}")
 
     def error(self, message: str) -> None:
@@ -145,7 +143,7 @@ class Display:
     def info(self, message: str) -> None:
         """Display info line."""
         ts = self._timestamp()
-        self.console.print(f"  {ts} {message}")
+        self.console.print(f"  {ts} {message}", highlight=False)
         self._log(message)
 
     def warn(self, message: str) -> None:

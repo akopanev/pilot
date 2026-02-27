@@ -7,6 +7,8 @@ import threading
 from pilot.display import Display
 from pilot.executors import ExecutorPool
 from pilot.models import PipelineConfig, PipelineState, Stage
+from rich.markup import escape as rich_escape
+
 from pilot.signals import BUILTIN_SIGNALS
 from pilot.state import clear_state, read_state, write_state
 from pilot.templates import TemplateError, resolve_templates
@@ -200,13 +202,13 @@ class PipelineEngine:
         self._live_signals.append(sig)
         if sig.name == "var" and "key" in sig.attrs:
             write_var(self.vars_path, sig.attrs["key"], sig.content)
-            self.display.info(
-                f"[dim]var {sig.attrs['key']}={sig.content}[/]"
-            )
+            key = rich_escape(sig.attrs["key"])
+            val = rich_escape(sig.content)
+            self.display.info(f"[dim]var[/] {key}[dim]=[/]{val}")
         elif sig.name == "update":
-            self.display.update(sig.content)
+            self.display.update(rich_escape(sig.content))
         else:
-            self.display.domain_signal(sig.name, sig.content)
+            self.display.domain_signal(sig.name, rich_escape(sig.content))
 
     def _wait(self) -> None:
         self.cancel.wait(timeout=self.delay)
