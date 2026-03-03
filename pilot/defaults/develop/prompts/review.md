@@ -31,6 +31,11 @@ Strictly sequential. No skipping.
      - Safe? No secrets, no vulnerabilities.
      - Scoped? No unrelated files changed.
 
+## Rules
+- **Build > scope.** If a file change is needed for build/typecheck/lint to pass, it is in-scope. Never reject a change that fixes a build error as "out of scope" — that creates an impossible loop.
+- **Consistent feedback.** Read existing notes before writing new ones. Never contradict a previous review. If a prior review said "revert file X" but reverting breaks the build, the correct action is PASS (the fix agent resolved the conflict), not another rejection.
+- **Actionable fixes only.** Every FAIL note must have a concrete FIX that the fix agent can apply without creating new failures. If you cannot describe a fix that passes all checks, the issue is not actionable — skip it.
+
 ## Result: PASS
 
 1. `tk add-note {{var:PILOT_TASK_ID}} "PASS: <summary>"`.
