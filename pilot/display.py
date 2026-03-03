@@ -44,27 +44,28 @@ class Display:
             stderr=False,
         )
         self.verbose = verbose
-        self._log_file = None
+        self._log_dir = None
+        self._round_file = None
 
-    def open_log(self, path: str) -> None:
-        """Open a log file for plain-text mirroring."""
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        self._log_file = open(path, "a")
+    def open_log(self, log_dir: str) -> None:
+        """Open log directory for per-round logs."""
+        os.makedirs(log_dir, exist_ok=True)
+        self._log_dir = log_dir
 
     def _log(self, message: str) -> None:
-        """Write a plain-text line to the log file."""
-        if not self._log_file:
+        """Write a plain-text line to current round log."""
+        if not self._round_file:
             return
         ts = datetime.now().strftime("%H:%M:%S")
         plain = _MARKUP_RE.sub("", message)
-        self._log_file.write(f"[{ts}] {plain}\n")
-        self._log_file.flush()
+        self._round_file.write(f"[{ts}] {plain}\n")
+        self._round_file.flush()
 
     def close(self) -> None:
-        """Close the log file."""
-        if self._log_file:
-            self._log_file.close()
-            self._log_file = None
+        """Close log files."""
+        if self._round_file:
+            self._round_file.close()
+            self._round_file = None
 
     def banner(self) -> None:
         """Startup banner."""
@@ -82,6 +83,15 @@ class Display:
     def round_header(self, round_num: int, stage_name: str,
                      executor: str, model: str | None) -> None:
         """Round divider with stage and runner info."""
+        # Open per-round log file
+        if self._log_dir:
+            if self._round_file:
+                self._round_file.close()
+            slug = f"{executor}-{model}" if model else executor
+            slug = slug.replace("/", "-")
+            filename = f"{round_num:03d}-{stage_name}-{slug}.txt"
+            self._round_file = open(os.path.join(self._log_dir, filename), "w")
+
         runner_label = f"({executor} / {model})" if model else f"({executor})"
         # Build left-aligned header: ─── Round N | stage  (runner) ────────
         title = f"Round {round_num} | {stage_name}  {runner_label}"

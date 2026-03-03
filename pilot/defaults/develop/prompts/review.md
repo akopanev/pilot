@@ -21,7 +21,7 @@ Strictly sequential. No skipping.
 5. **Diff**: `git diff {{var:PILOT_DEFAULT_BRANCH}}...HEAD`. No changes? PASS.
 6. **Read code**: Open and read every changed file. Understand the full context — not just the diff.
 7. **Verify**:
-   - Emit `<signal:update>verifying</signal:update>`.
+   - Emit `<signal:update>verifying {{var:PILOT_TASK_ID}}</signal:update>`.
    - **Build**: Run build command. Fail? FAIL.
    - **Lint**: Run linter. Fail? FAIL.
    - **Tests**: Run tests. Fail? FAIL.

@@ -16,11 +16,11 @@ Strictly sequential. No skipping.
 2. **Emit**: `<signal:update>fix: {{var:PILOT_TASK_ID}}</signal:update>`.
 3. **Checkout**: `git checkout {{var:PILOT_WORKING_BRANCH}}`.
 4. **Fix**:
-   - Emit `<signal:update>fixing</signal:update>`.
+   - Emit `<signal:update>fixing {{var:PILOT_TASK_ID}}</signal:update>`.
    - **Surgical.** Fix ONLY the reported issues.
    - Verify each fix locally.
 5. **Verify**:
-   - Emit `<signal:update>verifying</signal:update>`.
+   - Emit `<signal:update>verifying {{var:PILOT_TASK_ID}}</signal:update>`.
    - Build. Lint. Tests. Fix regressions.
 6. **Commit**: `git add . && git commit -m "{{var:PILOT_TASK_ID}}: fix review issues"`.
 
