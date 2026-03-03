@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import platform
+import subprocess
 
 import graphviz
 
@@ -17,7 +19,7 @@ def build_graph(config_path: str, output: str | None = None) -> str:
         name="pipeline",
         format="png",
         graph_attr={
-            "rankdir": "TB",
+            "rankdir": "LR",
             "fontname": "Helvetica",
             "bgcolor": "white",
             "pad": "0.5",
@@ -88,4 +90,19 @@ def build_graph(config_path: str, output: str | None = None) -> str:
     if output is None:
         output = os.path.splitext(os.path.basename(config_path))[0]
 
-    return dot.render(output, cleanup=True)
+    path = dot.render(output, cleanup=True)
+    return path
+
+
+def open_file(path: str) -> None:
+    """Open a file with the system viewer (no-op in Docker)."""
+    if os.environ.get("PILOT_DOCKER"):
+        return
+    system = platform.system()
+    try:
+        if system == "Darwin":
+            subprocess.Popen(["open", path])
+        elif system == "Linux":
+            subprocess.Popen(["xdg-open", path])
+    except FileNotFoundError:
+        pass

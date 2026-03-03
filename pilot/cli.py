@@ -86,7 +86,7 @@ def cmd_validate(args) -> None:
 
 def cmd_graph(args) -> None:
     """Generate pipeline graph as PNG."""
-    from pilot.graph import build_graph
+    from pilot.graph import build_graph, open_file
     display = Display()
     try:
         output = build_graph(args.pipeline, args.output)
@@ -94,6 +94,8 @@ def cmd_graph(args) -> None:
         display.error(str(e))
         sys.exit(1)
     display.console.print(f"[success]Graph saved:[/] {output}")
+    if not args.no_open:
+        open_file(output)
 
 
 def cmd_init(args) -> None:
@@ -160,6 +162,7 @@ def main() -> None:
     graph_p = sub.add_parser("graph", help="Generate pipeline graph as PNG")
     graph_p.add_argument("pipeline", help="Path to pipeline yaml")
     graph_p.add_argument("-o", "--output", help="Output file path (without extension)")
+    graph_p.add_argument("--no-open", action="store_true", help="Don't open the image")
 
     # pilot init
     sub.add_parser("init", help="Scaffold .pilot/ with default dev pipeline")
