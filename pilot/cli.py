@@ -84,6 +84,18 @@ def cmd_validate(args) -> None:
     display.console.print(f"[success]Valid[/]: {len(config.stages)} stages")
 
 
+def cmd_graph(args) -> None:
+    """Generate pipeline graph as PNG."""
+    from pilot.graph import build_graph
+    display = Display()
+    try:
+        output = build_graph(args.pipeline, args.output)
+    except ConfigError as e:
+        display.error(str(e))
+        sys.exit(1)
+    display.console.print(f"[success]Graph saved:[/] {output}")
+
+
 def cmd_init(args) -> None:
     """Copy default dev pipeline into .pilot/ in the current directory."""
     display = Display()
@@ -144,6 +156,11 @@ def main() -> None:
     val_p = sub.add_parser("validate", help="Validate pipeline yaml")
     val_p.add_argument("pipeline", help="Path to pipeline yaml")
 
+    # pilot graph <pipeline.yaml>
+    graph_p = sub.add_parser("graph", help="Generate pipeline graph as PNG")
+    graph_p.add_argument("pipeline", help="Path to pipeline yaml")
+    graph_p.add_argument("-o", "--output", help="Output file path (without extension)")
+
     # pilot init
     sub.add_parser("init", help="Scaffold .pilot/ with default dev pipeline")
 
@@ -154,7 +171,7 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        {"run": cmd_run, "validate": cmd_validate, "init": cmd_init}[args.command](args)
+        {"run": cmd_run, "validate": cmd_validate, "init": cmd_init, "graph": cmd_graph}[args.command](args)
     except ConfigError as e:
         print(f"Config error: {e}", file=sys.stderr)
         sys.exit(1)

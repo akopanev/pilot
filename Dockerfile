@@ -3,7 +3,7 @@ FROM node:22-slim
 # System deps (node/npm/corepack already in base image)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git python3 python3-pip python3-venv \
-    ripgrep bash curl ca-certificates jq gosu \
+    ripgrep bash curl ca-certificates jq gosu graphviz \
     && rm -rf /var/lib/apt/lists/*
 
 # Enable corepack (pnpm/yarn available without separate install)
