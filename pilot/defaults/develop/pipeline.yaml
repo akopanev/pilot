@@ -43,6 +43,7 @@ stages:
     on_signal:
       approved: merge       # pass — squash merge
       rejected: fix         # fail — send back for fixes
+      stuck: escalate       # Catch-22 detected — escalate to chairman
       failed: __exit__      # agent failed — stop pipeline
       default: review       # no signal — retry review
 
@@ -67,5 +68,29 @@ stages:
       executor: claude-code
       model: sonnet
     on_signal:
+      stuck: escalate       # contradictions detected — escalate to chairman
       failed: __exit__      # agent failed — stop pipeline
       default: review       # always back to review
+
+  # Escalation — "chairman" resolves stuck fix/review loops
+  escalate:
+    prompt: |
+      {{file:prompts/escalate.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      approve: merge        # override: code is correct, merge it
+      skip: __exit__            # task is broken, abandon it
+      failed: __exit__      # fatal error — stop pipeline
+      default: __exit__         # can't resolve — skip
+
+  # Skip stuck task — clean up and move on
+  skip:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/skip.sh}}
+    on_signal:
+      failed: __exit__      # skip failed — stop pipeline
+      default: pick         # back to picking next task

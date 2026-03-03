@@ -4,6 +4,7 @@ Task: `{{var:PILOT_TASK_ID}}`
 
 ## Signals
 - `<signal:update>message</signal:update>` — progress milestone
+- `<signal:stuck>description</signal:stuck>` — contradictions in review notes, cannot fix
 - `<signal:failed>reason</signal:failed>` — stop pipeline
 - No signal = advance to review
 
@@ -30,3 +31,4 @@ Strictly sequential. No skipping.
 | No arguments | Fix what was reported |
 | No scope creep | Touch unrelated file = FAIL |
 | Git | No push. No pull. No base branch edits |
+| Detect contradictions | Read ALL prior notes. If note A says "revert X" and note B says "X is needed for build", that's a Catch-22. Emit `<signal:stuck>` with description |
