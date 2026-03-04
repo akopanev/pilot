@@ -41,9 +41,14 @@ def build_graph(config_path: str, output: str | None = None) -> str:
     dot.node("__start__", "", shape="point", width="0.2")
     dot.edge("__start__", config.start_stage)
 
-    # Exit node
-    dot.node("__exit__", "EXIT", shape="doubleoctagon",
+    # Exit nodes
+    dot.node("__succeed__", "DONE", shape="doubleoctagon",
+             fillcolor="#ddffdd", style="filled", fontsize="10")
+    dot.node("__fail__", "FAIL", shape="doubleoctagon",
              fillcolor="#ffcccc", style="filled", fontsize="10")
+
+    # Track which exit nodes are actually used
+    exits_used = set()
 
     # Stage nodes
     for name, stage in config.stages.items():
@@ -73,18 +78,29 @@ def build_graph(config_path: str, output: str | None = None) -> str:
     # Signal edges
     for name, stage in config.stages.items():
         for signal, trans in stage.on_signal.items():
-            target = trans.to or "__exit__"
+            if trans.to is None:
+                target = "__fail__" if trans.fail else "__succeed__"
+                exits_used.add(target)
+            else:
+                target = trans.to
 
             edge_attrs: dict[str, str] = {}
             if signal == "default":
                 edge_attrs["style"] = "dashed"
                 edge_attrs["color"] = "#999999"
                 edge_attrs["fontcolor"] = "#999999"
-            elif target == "__exit__":
+            elif target in ("__succeed__", "__fail__"):
                 edge_attrs["color"] = "#cc0000"
                 edge_attrs["fontcolor"] = "#cc0000"
 
             dot.edge(name, target, label=signal, **edge_attrs)
+
+    # Remove unused exit nodes
+    for node_id in ("__succeed__", "__fail__"):
+        if node_id not in exits_used:
+            # graphviz doesn't support node removal, but orphan nodes
+            # without edges won't clutter the layout much
+            pass
 
     # Output path — default to pipeline basename
     if output is None:

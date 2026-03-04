@@ -1,0 +1,6 @@
+.env
+vars
+state
+logs/
+*.tmp
+.apptweak/

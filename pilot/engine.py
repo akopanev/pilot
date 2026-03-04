@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import threading
 import time
@@ -53,6 +54,21 @@ class PipelineEngine:
         else:
             self.state = PipelineState(stage=config.start_stage)
 
+    def _load_env_file(self) -> None:
+        """Load .env file from config directory if it exists."""
+        env_path = os.path.join(self.config_dir, ".env")
+        if not os.path.isfile(env_path):
+            return
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, _, value = line.partition("=")
+                    os.environ[key.strip()] = value.strip()
+        self.display.info("[dim].env loaded[/]")
+
     def _sync_env(self) -> None:
         """Export vars to file and os.environ.
 
@@ -73,6 +89,40 @@ class PipelineEngine:
         return f"{seconds}s"
 
     def run(self) -> None:
+        # Load .env (secrets) before anything
+        self._load_env_file()
+
+        # Pipeline pre_pipeline
+        if self.config.pre_pipeline:
+            if not self._run_step("pre_pipeline", self.config.pre_pipeline):
+                raise PipelineError("pre_pipeline failed")
+
+        exit_status = "failed"
+        try:
+            exit_status = self._main_loop()
+        finally:
+            os.environ["PILOT_EXIT_STATUS"] = exit_status
+
+            # post_pipeline ALWAYS runs (cleanup)
+            if self.config.post_pipeline:
+                if not self._run_step("post_pipeline", self.config.post_pipeline):
+                    self.display.warn("post_pipeline failed")
+
+            # Clear state before conditional hooks (avoid stale state if chaining)
+            if exit_status == "success":
+                clear_state(self.state_path)
+                clear_vars(self.vars_path)
+
+            # Conditional hooks (notify / chain)
+            if exit_status == "success" and self.config.on_pipeline_success:
+                if not self._run_step("on_pipeline_success", self.config.on_pipeline_success):
+                    self.display.warn("on_pipeline_success failed")
+            elif exit_status == "failed" and self.config.on_pipeline_failure:
+                if not self._run_step("on_pipeline_failure", self.config.on_pipeline_failure):
+                    self.display.warn("on_pipeline_failure failed")
+
+    def _main_loop(self) -> str:
+        """Run the main pipeline loop. Returns 'success' or 'failed'."""
         consecutive_failures = 0
         round_num = 0
         pipeline_start = time.monotonic()
@@ -159,24 +209,26 @@ class PipelineEngine:
             else:
                 raise PipelineError(f"No default in stage '{stage.name}'")
 
-            # Transition
+            # Transition — exit pipeline
             if transition.to is None:
                 total = int(time.monotonic() - pipeline_start)
                 summary = domain.content if domain else "complete"
-                is_failure = domain and domain.name == "failed"
-                if is_failure:
+                if transition.fail:
                     self.display.error(f"Pipeline stopped: {summary}")
+                    return "failed"
                 else:
                     self.display.done(summary, f"{round_num} rounds, {self._fmt_duration(total)}")
-                    clear_state(self.state_path)
-                    clear_vars(self.vars_path)
-                break
+                    return "success"
 
+            # Transition — next stage
             old_stage = self.state.stage
             self.state.stage = transition.to
             write_state(self.state_path, self.state)
             self.display.transition(old_stage, transition.to)
             self._wait()
+
+        # cancel_event was set
+        return "failed"
 
     def _run_with_retries(self, stage: Stage, prompt: str,
                           known: set[str]) -> ExecutorResult:

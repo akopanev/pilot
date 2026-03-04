@@ -14,7 +14,8 @@ class Runner:
 
 @dataclass
 class Transition:
-    to: str | None      # target stage name, None = stop pipeline
+    to: str | None          # target stage name, None = stop pipeline
+    fail: bool = False      # True for __fail__ exits (preserve state)
 
 
 @dataclass
@@ -34,6 +35,10 @@ class PipelineConfig:
     vars: dict[str, str]                    # key=env var name, value=value
     stages: dict[str, Stage]                # ordered dict, first = entry
     start_stage: str                        # first key in stages
+    pre_pipeline: str | None = None             # shell: setup (before main loop)
+    post_pipeline: str | None = None            # shell: cleanup (always runs)
+    on_pipeline_success: str | None = None      # shell: notify/chain (on success)
+    on_pipeline_failure: str | None = None      # shell: alert (on failure)
 
 
 @dataclass

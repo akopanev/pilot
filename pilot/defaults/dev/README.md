@@ -90,7 +90,7 @@ Round 4 — merge
   default → pick
   state: pick
 
-  ... next task or <signal:completed> → __exit__ (cleans state + vars)
+  ... next task or <signal:completed> → __succeed__ (cleans state + vars)
 ```
 
 Vars are available two ways:

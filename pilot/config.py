@@ -27,13 +27,15 @@ def _parse_runner(data: dict, label: str) -> Runner:
 
 
 def _parse_transition(data, signal_name: str, stage_name: str) -> Transition:
-    if data is None or data == "__exit__":
-        return Transition(to=None)
+    if data is None or data == "__succeed__":
+        return Transition(to=None, fail=False)
+    if data == "__fail__":
+        return Transition(to=None, fail=True)
     if isinstance(data, str):
         return Transition(to=data)
     raise ConfigError(
         f"Stage '{stage_name}' signal '{signal_name}': "
-        f"must be a stage name, '__exit__', or null"
+        f"must be a stage name, '__succeed__', '__fail__', or null"
     )
 
 
@@ -127,9 +129,18 @@ def load_config(path: str) -> PipelineConfig:
     else:
         start_stage = next(iter(stages))
 
+    pre_pipeline = raw.get("pre_pipeline")
+    post_pipeline = raw.get("post_pipeline")
+    on_pipeline_success = raw.get("on_pipeline_success")
+    on_pipeline_failure = raw.get("on_pipeline_failure")
+
     return PipelineConfig(
         version=version,
         vars=config_vars,
         stages=stages,
         start_stage=start_stage,
+        pre_pipeline=pre_pipeline,
+        post_pipeline=post_pipeline,
+        on_pipeline_success=on_pipeline_success,
+        on_pipeline_failure=on_pipeline_failure,
     )

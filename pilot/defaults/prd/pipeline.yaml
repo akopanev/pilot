@@ -1,0 +1,40 @@
+# PRD pipeline — research competitors → generate PRD
+version: "0.1"
+starting: setup
+
+vars:
+  PILOT_KEYWORDS: ""           # Comma-separated: "habit tracker,daily habits,routine"
+  PILOT_BRIEF: "brief.md"     # Path to user brief (relative to .pilot/prd/)
+  PILOT_PRD_OUTPUT: "prd.md"  # Where to write the PRD (relative to project root)
+
+stages:
+  setup:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/setup.sh}}
+    on_signal:
+      ready: gather
+      failed: __fail__
+      default: setup
+
+  gather:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/gather.sh}}
+    on_signal:
+      ready: analyze
+      failed: __fail__
+      default: gather
+
+  analyze:
+    prompt: |
+      {{file:prompts/analyze.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: __succeed__
+      failed: __fail__
+      default: __succeed__

@@ -15,8 +15,8 @@ stages:
         {{file:scripts/pick.sh}}
     on_signal:
       ready: implement      # task picked — go implement
-      completed: __exit__   # no tasks left — stop pipeline
-      failed: __exit__      # fatal error — stop pipeline
+      completed: __succeed__   # no tasks left — done
+      failed: __fail__      # fatal error
       default: pick         # retry
 
   # Implement the task (codex primary, claude fallback)
@@ -30,7 +30,7 @@ stages:
       executor: claude-code
       model: sonnet
     on_signal:
-      failed: __exit__      # agent failed — stop pipeline
+      failed: __fail__      # agent failed
       default: verify       # always goes to verify gate
 
   # Verify gate — typecheck, lint, tests (mechanical check)
@@ -42,7 +42,7 @@ stages:
     on_signal:
       approved: review      # checks pass — send to reviewer
       rejected: fix         # checks fail — note added, send to fix
-      failed: __exit__      # fatal error — stop pipeline
+      failed: __fail__      # fatal error
       default: review       # no signal — retry
 
   # Code review — approve or reject
@@ -56,7 +56,7 @@ stages:
       approved: merge       # pass — squash merge
       rejected: fix         # fail — send back for fixes
       stuck: escalate       # Catch-22 detected — escalate to chairman
-      failed: __exit__      # agent failed — stop pipeline
+      failed: __fail__      # agent failed
       default: review       # no signal — retry review
 
   # Squash merge feature branch, close task, clean up
@@ -66,7 +66,7 @@ stages:
       command: |
         {{file:scripts/merge.sh}}
     on_signal:
-      failed: __exit__      # merge failed — stop pipeline
+      failed: __fail__      # merge failed
       default: pick         # back to picking next task
 
   # Address review feedback
@@ -81,7 +81,7 @@ stages:
       model: sonnet
     on_signal:
       stuck: escalate       # contradictions detected — escalate to chairman
-      failed: __exit__      # agent failed — stop pipeline
+      failed: __fail__      # agent failed
       default: verify       # always back through verify gate
 
   # Escalation — "chairman" resolves stuck fix/review loops
@@ -93,6 +93,6 @@ stages:
       model: opus
     on_signal:
       approve: merge        # override: code is correct, merge it
-      skip: __exit__            # task is broken, human must look
-      failed: __exit__      # fatal error — stop pipeline
-      default: __exit__         # can't resolve — human must look
+      skip: __fail__        # task is broken, human must look
+      failed: __fail__      # fatal error
+      default: __fail__     # can't resolve — human must look
