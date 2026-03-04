@@ -17,7 +17,7 @@ stages:
       ready: implement      # task picked — go implement
       completed: __succeed__   # no tasks left — done
       failed: __fail__      # fatal error
-      default: pick         # retry
+      default: __fail__         # retry
 
   # Implement the task (codex primary, claude fallback)
   implement:
