@@ -11,8 +11,8 @@ vars:
 
 pre_pipeline: |
   {{file:scripts/pre_pipeline.sh}}
-post_pipeline: |
-  {{file:scripts/post_pipeline.sh}}
+on_pipeline_success: |
+  {{file:scripts/cleanup.sh}}
 
 stages:
   gather:

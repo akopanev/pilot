@@ -130,7 +130,6 @@ def load_config(path: str) -> PipelineConfig:
         start_stage = next(iter(stages))
 
     pre_pipeline = raw.get("pre_pipeline")
-    post_pipeline = raw.get("post_pipeline")
     on_pipeline_success = raw.get("on_pipeline_success")
     on_pipeline_failure = raw.get("on_pipeline_failure")
 
@@ -140,7 +139,6 @@ def load_config(path: str) -> PipelineConfig:
         stages=stages,
         start_stage=start_stage,
         pre_pipeline=pre_pipeline,
-        post_pipeline=post_pipeline,
         on_pipeline_success=on_pipeline_success,
         on_pipeline_failure=on_pipeline_failure,
     )
