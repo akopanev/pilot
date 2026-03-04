@@ -1,4 +1,4 @@
-# PRD pipeline — research competitors → analyze features → generate PRD
+# PRD pipeline — gather competitors → extract features → build baseline
 version: "0.1"
 starting: gather
 
@@ -6,7 +6,7 @@ vars:
   PILOT_KEYWORDS: ""                       # Comma-separated: "habit tracker,daily habits,routine"
   PILOT_NUM_TOP_APPS: "5"
   PILOT_APPTWEAK_OUTPUT_DIR: "data/competitors"
-  PILOT_FINDINGS: "findings.md"            # Competitor feature baseline (output of analyze)
+  PILOT_FINDINGS: "data/findings.md"       # Feature baseline (output of baseline stage)
 
 pre_pipeline: |
   {{file:scripts/pre_pipeline.sh}}
@@ -30,6 +30,17 @@ stages:
     runner:
       executor: claude-code
       model: opus
+    on_signal:
+      completed: baseline
+      failed: __fail__
+      default: baseline
+
+  baseline:
+    prompt: |
+      {{file:prompts/baseline.md}}
+    runner:
+      executor: claude-code
+      model: sonnet
     on_signal:
       completed: __succeed__
       failed: __fail__

@@ -1,108 +1,98 @@
-# Protocol: Competitor Analysis
+# Protocol: Feature Extraction
 
-Analyze competitor apps — screenshots and metadata — to build a feature baseline.
+Extract features from competitor app screenshots. One agent per app, all in parallel.
 
 ## Signals
 - `<signal:update>message</signal:update>` — progress
-- `<signal:completed>summary</signal:completed>` — findings written
+- `<signal:completed>summary</signal:completed>` — extraction done
 - `<signal:failed>reason</signal:failed>` — fatal only
 
 ## Inputs
 
-- **Config dir**: `{{var:PILOT_CONFIG_DIR}}`
 - **Competitor data**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json`
-- **Screenshots**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/<app-slug>/screenshot_*.jpg`
 
 ## Output
 
-Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}`
+Per-app files: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/<app-slug>/features.md`
 
 ## Execution
 
 1. Read `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json`. Parse the app list.
-2. `<signal:update>analyzing N competitors in parallel</signal:update>`
-3. **For each app, launch a Task agent in parallel.** Use the Task tool — one call per app, all in a single message so they run concurrently. Each agent receives:
-   - The app's metadata (title, subtitle, description, rating, categories, features)
-   - Instruction to open EVERY screenshot listed in `screenshots_local` using the Read tool (Read can display images)
-   - Instruction to return a structured analysis (see format below)
+2. `<signal:update>extracting features from N apps</signal:update>`
+3. **For each app, launch a Task agent in parallel.** Use the Task tool — one call per app, ALL in a single message so they run concurrently. Each agent:
+   - Receives the app metadata and screenshot paths
+   - MUST open every screenshot with the Read tool
+   - Writes `features.md` into the app's folder
+   - Returns confirmation
 
-4. Collect all agent results.
-5. Synthesize into `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}` (see output format below).
-6. `<signal:completed>N competitors analyzed, findings written</signal:completed>`
+4. Verify each `features.md` was written.
+5. `<signal:completed>N apps analyzed</signal:completed>`
 
 ## Per-App Agent Prompt
 
 Give each Task agent a prompt like this (fill in the actual data):
 
 ```
-Analyze this competitor app. You MUST open and examine EVERY screenshot.
+Extract features from this app by examining its screenshots and metadata. Research task only — do NOT edit or create any files other than the output file specified below.
 
 App: {title}
-Rating: {rating} | Categories: {categories}
 Subtitle: {subtitle}
 Description: {description}
-Listed features: {features}
 
-Screenshots (open ALL of them with the Read tool):
-{list each path from screenshots_local}
+Screenshots (open EVERY one with the Read tool — do not skip any):
+{list each absolute path from screenshots_local}
 
-After examining every screenshot, return your analysis in this exact format:
+First, read the title, subtitle, and description — note any features mentioned.
+Then open each screenshot. For each one, describe what screen it shows and
+list every feature visible. Then write the results to:
+{app_folder}/features.md
 
-## {title}
+Use this exact format:
 
-**Overview**: One sentence — what this app does and who it's for.
-**Rating**: {rating} | **Category position**: {categories}
+# {title}
 
-### Features Observed
-For each distinct feature you can identify from screenshots + metadata:
-- **Feature name** — what it does. (Source: screenshot N / metadata / description)
+## Screen-by-Screen
 
-### UI/UX Patterns
-- Navigation pattern (tab bar, sidebar, etc.)
-- Visual style (minimal, colorful, dark, etc.)
-- Key interactions visible in screenshots
+For each screenshot, in order:
 
-### Strengths
-Bullet list — what this app does well.
+### Screenshot N
+- **Screen**: what this screen is (e.g., "Main dashboard", "Settings", "Workout in progress")
+- **Features visible**:
+  - Feature name — what it does, what UI element represents it
+  - Feature name — ...
 
-### Weaknesses
-Bullet list — gaps, missing features, or poor UX visible in screenshots.
-```
+### Screenshot N+1
+...
 
-## Output Format for {{var:PILOT_FINDINGS}}
+## Features
 
-```markdown
-# Competitor Analysis Findings
+Deduplicated list of all features found across screenshots, title, subtitle, and description.
+Group by category (e.g., Tracking, Social, Gamification, Settings).
 
-> N competitors analyzed for keywords: ...
+- **Feature name** — one sentence description (source: screenshot N / description / subtitle)
+- **Feature name** — one sentence description (source: screenshots N, M)
 
-## Per-App Analysis
+## Navigation
+- Primary navigation pattern (tab bar, sidebar, hamburger, etc.)
+- Tab/section names and count
+- Secondary navigation (segmented controls, drill-down, etc.)
 
-{paste each agent's analysis here, in order}
+## Onboarding
+If any screenshot shows onboarding, first-run, or welcome screens:
+- What steps are shown
+- What information is collected
+- What choices the user makes
 
-## Feature Matrix
-
-| Feature | App1 | App2 | App3 | ... |
-|:--------|:----:|:----:|:----:|:---:|
-| Feature X | ✓ | ✓ | — | ... |
-| Feature Y | — | ✓ | ✓ | ... |
-
-Build this matrix from the per-app feature lists. Every unique feature
-observed across all apps gets a row.
-
-## Key Patterns
-
-- Common features (present in 3+ apps)
-- Differentiators (unique to one app)
-- Gaps (missing across all or most apps)
+If no onboarding screens are visible, write: "No onboarding screens visible."
 ```
 
 ## Rules
 
 | Rule | Constraint |
 |:-----|:-----------|
-| Every screenshot matters | Agents MUST open every image. Features are in the screenshots, not just metadata |
-| Parallel execution | Launch ALL app agents in a single message — do not analyze sequentially |
-| Observable features only | Only list features you can see in screenshots or read in metadata. No guessing |
-| Consistent naming | Use the same feature name across apps (e.g. "streak tracking", not "streaks" vs "streak counter") |
-| No recommendations | This is analysis, not prescription. Report what exists. Do not suggest what to build |
+| Every screenshot | Agents MUST open every image. Do not skip. Do not summarize without looking |
+| All parallel | Launch ALL agents in one message |
+| Screen-by-screen first | Describe each screenshot individually before deduplicating into the features list |
+| Facts only | Report what you see. No opinions, no judgments, no recommendations |
+| Cite screenshots | Every feature must reference which screenshot(s) it appears in |
+| Write to file | Each agent writes `features.md` in the app's folder |
