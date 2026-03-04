@@ -7,7 +7,7 @@ vars:
   PILOT_NUM_TOP_APPS: "5"
   PILOT_APPTWEAK_OUTPUT_DIR: "data/competitors"
   PILOT_REVIEW_COUNTRY: "us"               # Country code for App Store reviews
-  PILOT_REVIEW_PAGES: "2"                  # Pages per app (50 reviews/page, max 10)
+  PILOT_REVIEW_PAGES: "5"                  # Pages per app (50 reviews/page, max 10)
   PILOT_FINDINGS: "data/findings.md"       # Feature baseline (output of baseline stage)
   PILOT_RESEARCH: "data/research.md"       # Web research (output of research stage)
   PILOT_BRIEF: "brief.md"                 # User brief (relative to config dir)

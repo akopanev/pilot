@@ -10,6 +10,7 @@ Merge per-app feature extractions into a unified feature baseline for a PM writi
 ## Inputs
 
 - **Per-app features**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/*/features.md`
+- **Web research**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}`
 - **App metadata**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json`
 
 ## Output
@@ -20,8 +21,9 @@ Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}`
 
 1. Read `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json` for the app list.
 2. Read every `features.md` file (one per app folder).
-3. `<signal:update>building baseline from N apps</signal:update>`
-4. Merge all features into one deduplicated list. Same concept across apps = one entry.
+3. Read `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}` — includes features from apps not in top charts.
+4. `<signal:update>building baseline from N apps + web research</signal:update>`
+5. Merge ALL features — from screenshot analysis AND web research — into one deduplicated list. Same concept = one entry.
 5. Order by how common the feature is — universal features first, niche features last.
 6. Write `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}` in the format below.
 7. `<signal:completed>baseline: X features from N apps</signal:completed>`
