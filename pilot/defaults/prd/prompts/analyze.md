@@ -21,7 +21,9 @@ Per-app files: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/<app-
 2. `<signal:update>extracting features from N apps</signal:update>`
 3. **For each app, launch a Task agent in parallel.** Use the Task tool — one call per app, ALL in a single message so they run concurrently. Each agent:
    - Receives the app metadata (title, subtitle, description) and screenshot paths
+   - Receives the path to `reviews.json` in the app's folder (if it exists)
    - MUST open every screenshot with the Read tool
+   - MUST read reviews.json for user sentiment
    - Writes `features.md` into the app's folder
    - Returns confirmation
 
@@ -42,13 +44,17 @@ Description: {description}
 Screenshots (open EVERY one with the Read tool — do not skip any):
 {list each absolute path from screenshots_local}
 
+Reviews: {app_folder}/reviews.json
+(Read this file — it contains recent user reviews with ratings and text.)
+
 ## Process
 
 1. Read the title, subtitle, and description. Note features mentioned.
 2. Open EVERY screenshot. Study each one carefully.
-3. Build a complete feature list from everything you observed.
-4. Order features by importance — core features first, secondary features after.
-5. Write the result to: {app_folder}/features.md
+3. Read reviews.json. Note what users praise and complain about.
+4. Build a complete feature list from everything you observed.
+5. Order features by importance — core features first, secondary features after.
+6. Write the result to: {app_folder}/features.md
 
 ## Output format
 
@@ -76,6 +82,11 @@ If onboarding/welcome/first-run screens are visible:
 - Steps shown and information collected
 
 If none visible, write: "Not visible in screenshots."
+
+## User Sentiment
+
+From reviews — what do users love and hate about this app?
+Top 3-5 praises and top 3-5 complaints. Use actual user language.
 ```
 
 ## Rules

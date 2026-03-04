@@ -56,6 +56,14 @@ Common navigation and information architecture patterns observed across apps.
 
 Common onboarding flows observed. What information is typically collected,
 what choices users make on first run.
+
+## User Sentiment
+
+Common themes from user reviews across all apps.
+- What users consistently love (top 3-5 themes)
+- What users consistently hate (top 3-5 themes)
+
+Use actual user language where possible. No app names.
 ```
 
 ## Rules

@@ -1,4 +1,4 @@
-# PRD pipeline — gather competitors → extract features → baseline → PRD
+# PRD pipeline — gather → reviews → research → analyze → baseline → PRD
 version: "0.1"
 starting: gather
 
@@ -6,7 +6,10 @@ vars:
   PILOT_KEYWORDS: ""                       # Comma-separated: "habit tracker,daily habits,routine"
   PILOT_NUM_TOP_APPS: "5"
   PILOT_APPTWEAK_OUTPUT_DIR: "data/competitors"
+  PILOT_REVIEW_COUNTRY: "us"               # Country code for App Store reviews
+  PILOT_REVIEW_PAGES: "2"                  # Pages per app (50 reviews/page, max 10)
   PILOT_FINDINGS: "data/findings.md"       # Feature baseline (output of baseline stage)
+  PILOT_RESEARCH: "data/research.md"       # Web research (output of research stage)
   PILOT_BRIEF: "brief.md"                 # User brief (relative to config dir)
   PILOT_PRD: "data/prd.md"               # Final PRD (output of prd stage)
 
@@ -20,11 +23,29 @@ stages:
     runner:
       executor: shell
       command: |
-        {{file:scripts/gather.sh}}
+        {{file:scripts/gather_apptweak.sh}}
     on_signal:
-      ready: analyze
-      failed: __fail__
-      default: __succeed__
+      ready: gather_reviews
+      default: __fail__
+
+  gather_reviews:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/gather_reviews.sh}}
+    on_signal:
+      ready: research
+      default: __fail__
+
+  research:
+    prompt: |
+      {{file:prompts/research.md}}
+    runner:
+      executor: claude-code
+      model: sonnet
+    on_signal:
+      completed: analyze
+      default: __fail__
 
   analyze:
     prompt: |
@@ -34,8 +55,7 @@ stages:
       model: opus
     on_signal:
       completed: baseline
-      failed: __fail__
-      default: baseline
+      default: __fail__
 
   baseline:
     prompt: |
@@ -45,8 +65,7 @@ stages:
       model: sonnet
     on_signal:
       completed: prd
-      failed: __fail__
-      default: prd
+      default: __fail__
 
   prd:
     prompt: |
@@ -54,7 +73,7 @@ stages:
     runner:
       executor: claude-code
       model: opus
+    
     on_signal:
       completed: __succeed__
-      failed: __fail__
-      default: __succeed__
+      default: __fail__
