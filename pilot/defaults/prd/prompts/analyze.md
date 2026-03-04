@@ -1,62 +1,108 @@
-# Protocol: PRD Generation
+# Protocol: Competitor Analysis
+
+Analyze competitor apps — screenshots and metadata — to build a feature baseline.
 
 ## Signals
 - `<signal:update>message</signal:update>` — progress
-- `<signal:completed>summary</signal:completed>` — PRD written
+- `<signal:completed>summary</signal:completed>` — findings written
 - `<signal:failed>reason</signal:failed>` — fatal only
 
 ## Inputs
 
-1. **User brief**: `{{var:PILOT_BRIEF}}`
-2. **Competitor data**: `data/competitors/apps.json` + screenshot images in subdirectories
-3. **Output path**: `{{var:PILOT_PRD_OUTPUT}}`
+- **Config dir**: `{{var:PILOT_CONFIG_DIR}}`
+- **Competitor data**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json`
+- **Screenshots**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/<app-slug>/screenshot_*.jpg`
 
-## Steps
+## Output
 
-1. Read the user brief: `cat {{var:PILOT_BRIEF}}`
-2. Read competitor data: `cat data/competitors/apps.json`
-3. Look at competitor screenshots in `data/competitors/*/` — open each image.
-   Note UI patterns, features, design language.
-4. `<signal:update>analyzing competitors and brief</signal:update>`
-5. **Write the PRD** to `{{var:PILOT_PRD_OUTPUT}}`. Structure:
+Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}`
+
+## Execution
+
+1. Read `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json`. Parse the app list.
+2. `<signal:update>analyzing N competitors in parallel</signal:update>`
+3. **For each app, launch a Task agent in parallel.** Use the Task tool — one call per app, all in a single message so they run concurrently. Each agent receives:
+   - The app's metadata (title, subtitle, description, rating, categories, features)
+   - Instruction to open EVERY screenshot listed in `screenshots_local` using the Read tool (Read can display images)
+   - Instruction to return a structured analysis (see format below)
+
+4. Collect all agent results.
+5. Synthesize into `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}` (see output format below).
+6. `<signal:completed>N competitors analyzed, findings written</signal:completed>`
+
+## Per-App Agent Prompt
+
+Give each Task agent a prompt like this (fill in the actual data):
 
 ```
-# PRD: <Product Name>
+Analyze this competitor app. You MUST open and examine EVERY screenshot.
 
-## Vision
-One paragraph. What is this product and why does it exist.
+App: {title}
+Rating: {rating} | Categories: {categories}
+Subtitle: {subtitle}
+Description: {description}
+Listed features: {features}
 
-## Target User
-Who. Be specific — demographics, behavior, pain points.
+Screenshots (open ALL of them with the Read tool):
+{list each path from screenshots_local}
 
-## Competitive Landscape
-For each competitor analyzed:
-- Name, app store position, rating
-- Key features (what they do well)
-- Gaps (what they miss or do poorly)
-- UI/UX observations from screenshots
+After examining every screenshot, return your analysis in this exact format:
 
-## Feature List
-Numbered list. Each feature:
-- **F1: Feature Name** — one-line description
-  - Priority: must-have | should-have | nice-to-have
-  - Rationale: why this feature (from brief, competitive gap, or user need)
+## {title}
 
-## Non-Goals
-What this product explicitly does NOT do in v1.
+**Overview**: One sentence — what this app does and who it's for.
+**Rating**: {rating} | **Category position**: {categories}
 
-## Open Questions
-Decisions the user needs to make before planning begins.
+### Features Observed
+For each distinct feature you can identify from screenshots + metadata:
+- **Feature name** — what it does. (Source: screenshot N / metadata / description)
+
+### UI/UX Patterns
+- Navigation pattern (tab bar, sidebar, etc.)
+- Visual style (minimal, colorful, dark, etc.)
+- Key interactions visible in screenshots
+
+### Strengths
+Bullet list — what this app does well.
+
+### Weaknesses
+Bullet list — gaps, missing features, or poor UX visible in screenshots.
 ```
 
-6. `<signal:completed>PRD written to {{var:PILOT_PRD_OUTPUT}}</signal:completed>`
+## Output Format for {{var:PILOT_FINDINGS}}
+
+```markdown
+# Competitor Analysis Findings
+
+> N competitors analyzed for keywords: ...
+
+## Per-App Analysis
+
+{paste each agent's analysis here, in order}
+
+## Feature Matrix
+
+| Feature | App1 | App2 | App3 | ... |
+|:--------|:----:|:----:|:----:|:---:|
+| Feature X | ✓ | ✓ | — | ... |
+| Feature Y | — | ✓ | ✓ | ... |
+
+Build this matrix from the per-app feature lists. Every unique feature
+observed across all apps gets a row.
+
+## Key Patterns
+
+- Common features (present in 3+ apps)
+- Differentiators (unique to one app)
+- Gaps (missing across all or most apps)
+```
 
 ## Rules
 
 | Rule | Constraint |
 |:-----|:-----------|
-| Brief is truth | The user brief defines the product. Competitors inform, not dictate |
-| No scope creep | Don't add features just because competitors have them. Only if it serves the brief |
-| Be specific | "Good UX" is not a feature. "Swipe to complete habit with haptic feedback" is |
-| Prioritize | Must-have = launch blocker. Should-have = v1.1. Nice-to-have = backlog |
-| Screenshots matter | Note specific UI patterns worth adopting or avoiding. Reference by competitor name |
+| Every screenshot matters | Agents MUST open every image. Features are in the screenshots, not just metadata |
+| Parallel execution | Launch ALL app agents in a single message — do not analyze sequentially |
+| Observable features only | Only list features you can see in screenshots or read in metadata. No guessing |
+| Consistent naming | Use the same feature name across apps (e.g. "streak tracking", not "streaks" vs "streak counter") |
+| No recommendations | This is analysis, not prescription. Report what exists. Do not suggest what to build |

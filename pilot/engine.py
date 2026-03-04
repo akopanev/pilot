@@ -89,8 +89,10 @@ class PipelineEngine:
         return f"{seconds}s"
 
     def run(self) -> None:
-        # Export config dir so scripts can reference it regardless of CWD
-        os.environ["PILOT_CONFIG_DIR"] = os.path.abspath(self.config_dir)
+        # Export config dir so scripts and prompts can reference it
+        abs_config_dir = os.path.abspath(self.config_dir)
+        os.environ["PILOT_CONFIG_DIR"] = abs_config_dir
+        write_var(self.vars_path, "PILOT_CONFIG_DIR", abs_config_dir)
 
         # Load .env (secrets) before anything
         self._load_env_file()
