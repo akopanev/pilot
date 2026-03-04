@@ -26,10 +26,14 @@ def read_state(path: str) -> PipelineState | None:
 
 
 def write_state(path: str, state: PipelineState) -> None:
-    """Write state to file."""
+    """Write state to file (atomic via rename)."""
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w") as f:
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
         f.write(f"{state.stage}\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
 
 
 def clear_state(path: str) -> None:

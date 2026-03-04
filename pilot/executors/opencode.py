@@ -6,7 +6,7 @@ import os
 import signal
 import subprocess
 
-from pilot.signals import parse_signals
+from pilot.signals import SignalScanner
 from pilot.executors.result import ExecutorResult
 
 
@@ -34,22 +34,28 @@ class OpenCodeExecutor:
         )
 
         output_parts: list[str] = []
-        all_signals: list[Signal] = []
+        all_signals = []
+        scanner = SignalScanner(known_signals)
 
         try:
             for line in proc.stdout:
                 output_parts.append(line)
                 if on_output:
                     on_output(line)
-                for sig in parse_signals(line, known_signals):
+                for sig in scanner.feed(line):
                     all_signals.append(sig)
                     if on_signal:
                         on_signal(sig)
-
+        finally:
+            if proc.poll() is None:
+                _kill_process_group(proc)
             proc.wait()
-        except KeyboardInterrupt:
-            _kill_process_group(proc)
-            raise
+
+        # Flush remaining buffered signals
+        for sig in scanner.flush():
+            all_signals.append(sig)
+            if on_signal:
+                on_signal(sig)
 
         full_output = "".join(output_parts)
 

@@ -47,8 +47,12 @@ def write_var(path: str, key: str, value: str) -> None:
         lines.append(f"{key}={value}\n")
 
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w") as f:
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
         f.writelines(lines)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
 
 
 def export_vars(path: str) -> None:

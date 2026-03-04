@@ -6,7 +6,7 @@ import os
 import signal
 import subprocess
 
-from pilot.signals import parse_signals
+from pilot.signals import SignalScanner
 from pilot.executors.result import ExecutorResult
 
 
@@ -37,30 +37,28 @@ class GenericExecutor:
         )
 
         output_parts: list[str] = []
-        all_signals: list[Signal] = []
+        all_signals = []
+        scanner = SignalScanner(known_signals)
 
         try:
             for line in proc.stdout:
                 output_parts.append(line)
                 if on_output:
                     on_output(line)
-                for sig in parse_signals(line, known_signals):
+                for sig in scanner.feed(line):
                     all_signals.append(sig)
                     if on_signal:
                         on_signal(sig)
-
+        finally:
+            if proc.poll() is None:
+                _kill_process_group(proc)
             proc.wait()
-        except KeyboardInterrupt:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                proc.wait(timeout=5)
-            except (ProcessLookupError, subprocess.TimeoutExpired):
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                proc.wait()
-            raise
+
+        # Flush remaining buffered signals
+        for sig in scanner.flush():
+            all_signals.append(sig)
+            if on_signal:
+                on_signal(sig)
 
         full_output = "".join(output_parts)
 
@@ -70,3 +68,16 @@ class GenericExecutor:
             error=None if proc.returncode == 0 else f"exit code {proc.returncode}",
             signals=all_signals,
         )
+
+
+def _kill_process_group(proc: subprocess.Popen) -> None:
+    """Graceful shutdown: SIGTERM -> wait -> SIGKILL."""
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        proc.wait(timeout=5)
+    except (ProcessLookupError, subprocess.TimeoutExpired):
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()

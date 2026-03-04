@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import threading
 from datetime import datetime
 
 from rich.console import Console
@@ -46,6 +47,7 @@ class Display:
         self.verbose = verbose
         self._log_dir = None
         self._round_file = None
+        self._lock = threading.Lock()
 
     def open_log(self, log_dir: str) -> None:
         """Open log directory for per-round logs."""
@@ -53,19 +55,21 @@ class Display:
         self._log_dir = log_dir
 
     def _log(self, message: str) -> None:
-        """Write a plain-text line to current round log."""
-        if not self._round_file:
-            return
-        ts = datetime.now().strftime("%H:%M:%S")
-        plain = _MARKUP_RE.sub("", message)
-        self._round_file.write(f"[{ts}] {plain}\n")
-        self._round_file.flush()
+        """Write a plain-text line to current round log (thread-safe)."""
+        with self._lock:
+            if not self._round_file:
+                return
+            ts = datetime.now().strftime("%H:%M:%S")
+            plain = _MARKUP_RE.sub("", message)
+            self._round_file.write(f"[{ts}] {plain}\n")
+            self._round_file.flush()
 
     def close(self) -> None:
         """Close log files."""
-        if self._round_file:
-            self._round_file.close()
-            self._round_file = None
+        with self._lock:
+            if self._round_file:
+                self._round_file.close()
+                self._round_file = None
 
     def banner(self) -> None:
         """Startup banner."""
@@ -85,12 +89,13 @@ class Display:
         """Round divider with stage and runner info."""
         # Open per-round log file
         if self._log_dir:
-            if self._round_file:
-                self._round_file.close()
-            slug = f"{executor}-{model}" if model else executor
-            slug = slug.replace("/", "-")
-            filename = f"{round_num:03d}-{stage_name}-{slug}.txt"
-            self._round_file = open(os.path.join(self._log_dir, filename), "w")
+            with self._lock:
+                if self._round_file:
+                    self._round_file.close()
+                slug = f"{executor}-{model}" if model else executor
+                slug = slug.replace("/", "-")
+                filename = f"{round_num:03d}-{stage_name}-{slug}.txt"
+                self._round_file = open(os.path.join(self._log_dir, filename), "w")
 
         runner_label = f"({executor} / {model})" if model else f"({executor})"
         # Build left-aligned header: ─── Round N | stage  (runner) ────────

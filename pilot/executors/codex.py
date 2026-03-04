@@ -8,7 +8,7 @@ import subprocess
 import threading
 
 from pilot.executors.result import ExecutorResult
-from pilot.signals import parse_signals
+from pilot.signals import SignalScanner
 
 
 class CodexExecutor:
@@ -56,23 +56,32 @@ class CodexExecutor:
         stdout_parts: list[str] = []
         all_signals = []
         stdout_error = None
+        scanner = SignalScanner(known_signals)
+
         try:
             for line in proc.stdout:
                 stdout_parts.append(line)
                 if on_output:
                     on_output(line)
-                for sig in parse_signals(line, known_signals):
+                for sig in scanner.feed(line):
                     all_signals.append(sig)
                     if on_signal:
                         on_signal(sig)
         except KeyboardInterrupt:
-            _kill_process_group(proc)
             raise
         except Exception as e:
             stdout_error = str(e)
+        finally:
+            if proc.poll() is None:
+                _kill_process_group(proc)
+            stderr_thread.join(timeout=5)
+            proc.wait()
 
-        stderr_thread.join()
-        proc.wait()
+        # Flush remaining buffered signals
+        for sig in scanner.flush():
+            all_signals.append(sig)
+            if on_signal:
+                on_signal(sig)
 
         stdout_content = "".join(stdout_parts)
 

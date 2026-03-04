@@ -99,12 +99,12 @@ def cmd_graph(args) -> None:
 
 
 def cmd_init(args) -> None:
-    """Copy default dev pipeline into .pilot/ in the current directory."""
+    """Copy all default pipelines into .pilot/ in the current directory."""
     display = Display()
-    defaults_dir = Path(__file__).parent / "defaults" / "develop"
+    defaults_dir = Path(__file__).parent / "defaults"
 
     if not defaults_dir.is_dir():
-        display.error("Default pipeline not found in package.")
+        display.error("Default pipelines not found in package.")
         sys.exit(1)
 
     pilot_dir = Path.cwd() / ".pilot"
@@ -136,7 +136,7 @@ def cmd_init(args) -> None:
     if not copied and not skipped:
         display.console.print("[dim].pilot/ already fully initialized.[/]")
 
-    display.console.print(f"\n[dim]Next:[/] pilot run .pilot/pipeline.yaml")
+    display.console.print(f"\n[dim]Next:[/] pilot run .pilot/dev/pipeline.yaml")
 
 
 def main() -> None:
