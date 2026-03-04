@@ -1,6 +1,6 @@
 # Protocol: Feature Baseline
 
-Merge per-app feature extractions into a unified competitive baseline.
+Merge per-app feature extractions into a unified feature baseline for a PM writing a PRD.
 
 ## Signals
 - `<signal:update>message</signal:update>` — progress
@@ -18,45 +18,52 @@ Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}`
 
 ## Execution
 
-1. Read `apps.json` for the app list.
+1. Read `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json` for the app list.
 2. Read every `features.md` file (one per app folder).
 3. `<signal:update>building baseline from N apps</signal:update>`
-4. Normalize feature names across apps — same concept = same name.
-5. Write `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}` in the format below.
-6. `<signal:completed>baseline: X features across N apps</signal:completed>`
+4. Merge all features into one deduplicated list. Same concept across apps = one entry.
+5. Order by how common the feature is — universal features first, niche features last.
+6. Write `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}` in the format below.
+7. `<signal:completed>baseline: X features from N apps</signal:completed>`
 
 ## Output Format
 
 ```markdown
 # Feature Baseline
 
-> N competitors analyzed for keywords: ...
+> Based on N competitor apps in [category].
 
-## Feature Matrix
+## Features
 
-| Feature | App1 | App2 | App3 | ... |
-|:--------|:----:|:----:|:----:|:---:|
-| Feature X | ✓ | ✓ | — | ... |
-| Feature Y | — | ✓ | ✓ | ... |
+Unified, deduplicated feature list across all analyzed competitors.
+Ordered by prevalence — features found in most apps first.
 
-Every unique feature across all apps gets a row.
-Group rows by category (Tracking, Social, Gamification, etc.).
+### [Category]
 
-## Common Features
-Features present in majority of apps. One line each.
+- **Feature name** — what it does, how the user interacts with it. 2-3 sentences with enough detail for a PM to understand scope and expected behavior.
 
-## Differentiators
-Features unique to one app. Format: **Feature** — App Name.
+- **Feature name** — ...
 
-## Gaps
-Notable features missing across all or most apps.
+### [Category]
+
+- ...
+
+## Navigation Patterns
+
+Common navigation and information architecture patterns observed across apps.
+
+## Onboarding Patterns
+
+Common onboarding flows observed. What information is typically collected,
+what choices users make on first run.
 ```
 
 ## Rules
 
 | Rule | Constraint |
 |:-----|:-----------|
-| Normalize names | "Streak tracking" not "streaks" vs "streak counter" — same concept, same row |
-| No opinions | Matrix is factual. Present/absent, nothing else |
-| No recommendations | This is a map of what exists, not what to build |
-| Concise | Feature matrix is the core deliverable. Keep text sections brief |
+| No app names | This is a category baseline, not a comparison. Don't mention which app has what |
+| Normalize | Same concept = one entry. "Streak tracking" not "streaks" vs "streak counter" |
+| Describe, don't prescribe | Describe what the feature does. Don't recommend whether to build it |
+| Enough detail | A PM reading this should understand the feature's scope without seeing the apps |
+| Order by prevalence | Universal features first, rare/niche features last within each category |

@@ -1,4 +1,4 @@
-# PRD pipeline — gather competitors → extract features → build baseline
+# PRD pipeline — gather competitors → extract features → baseline → PRD
 version: "0.1"
 starting: gather
 
@@ -7,6 +7,8 @@ vars:
   PILOT_NUM_TOP_APPS: "5"
   PILOT_APPTWEAK_OUTPUT_DIR: "data/competitors"
   PILOT_FINDINGS: "data/findings.md"       # Feature baseline (output of baseline stage)
+  PILOT_BRIEF: "brief.md"                 # User brief (relative to config dir)
+  PILOT_PRD: "data/prd.md"               # Final PRD (output of prd stage)
 
 pre_pipeline: |
   {{file:scripts/pre_pipeline.sh}}
@@ -41,6 +43,17 @@ stages:
     runner:
       executor: claude-code
       model: sonnet
+    on_signal:
+      completed: prd
+      failed: __fail__
+      default: prd
+
+  prd:
+    prompt: |
+      {{file:prompts/prd.md}}
+    runner:
+      executor: claude-code
+      model: opus
     on_signal:
       completed: __succeed__
       failed: __fail__
