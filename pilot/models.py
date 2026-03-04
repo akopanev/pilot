@@ -24,6 +24,8 @@ class Stage:
     runner: Runner
     fallback_runner: Runner | None
     on_signal: dict[str, Transition]        # signal_name -> Transition
+    pre_step: str | None = None             # shell command before executor
+    post_step: str | None = None            # shell command after executor
 
 
 @dataclass

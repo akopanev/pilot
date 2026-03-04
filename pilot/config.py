@@ -68,12 +68,17 @@ def _parse_stage(name: str, data: dict) -> Stage:
     if "default" not in on_signal:
         raise ConfigError(f"Stage '{name}': 'on_signal' must include a 'default' entry")
 
+    pre_step = data.get("pre_step")
+    post_step = data.get("post_step")
+
     return Stage(
         name=name,
         prompt=prompt,
         runner=runner,
         fallback_runner=fallback_runner,
         on_signal=on_signal,
+        pre_step=pre_step,
+        post_step=post_step,
     )
 
 

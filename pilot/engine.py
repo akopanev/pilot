@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import threading
 import time
 
@@ -92,6 +93,20 @@ class PipelineEngine:
                 stage.runner.model,
             )
 
+            # pre_step — shell command before main executor
+            if stage.pre_step:
+                pre_ok = self._run_step("pre_step", stage.pre_step)
+                if not pre_ok:
+                    consecutive_failures += 1
+                    self.display.warn(
+                        f"pre_step failed, "
+                        f"consecutive failures {consecutive_failures}/3"
+                    )
+                    if consecutive_failures >= 3:
+                        raise PipelineError("3 consecutive round failures")
+                    self._wait()
+                    continue
+
             # Build prompt
             try:
                 prompt = self._build_prompt(stage)
@@ -103,6 +118,13 @@ class PipelineEngine:
 
             # Run executor with retries, then fallback with retries
             result = self._run_with_retries(stage, prompt, known)
+
+            # post_step — shell command after main executor (always runs)
+            if stage.post_step:
+                post_ok = self._run_step("post_step", stage.post_step)
+                if not post_ok:
+                    self.display.warn("post_step failed (continuing)")
+
             elapsed = int(time.monotonic() - round_start)
             self.display.info(f"[dim]round {round_num} · {self._fmt_duration(elapsed)}[/]")
 
@@ -228,6 +250,32 @@ class PipelineEngine:
             self.display.update(rich_escape(sig.content))
         else:
             self.display.domain_signal(sig.name, rich_escape(sig.content))
+
+    def _run_step(self, label: str, raw_command: str) -> bool:
+        """Run a shell command (pre_step / post_step). Returns True on success."""
+        try:
+            command = resolve_templates(raw_command, self.config_dir, self.vars_path)
+        except TemplateError as e:
+            self.display.warn(f"{label} template error: {e}")
+            return False
+
+        self.display.info(f"[dim]{label}[/]")
+        proc = subprocess.run(
+            command,
+            shell=True,
+            cwd=self.config_dir,
+            capture_output=True,
+            text=True,
+        )
+
+        if proc.stdout:
+            for line in proc.stdout.strip().splitlines():
+                self.display.executor_output(line)
+        if proc.returncode != 0:
+            if proc.stderr:
+                self.display.warn(f"{label} stderr: {proc.stderr.strip()}")
+            return False
+        return True
 
     def _wait(self) -> None:
         self.cancel.wait(timeout=self.delay)
