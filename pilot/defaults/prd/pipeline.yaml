@@ -3,9 +3,11 @@ version: "0.1"
 starting: gather
 
 vars:
-  PILOT_KEYWORDS: ""           # Comma-separated: "habit tracker,daily habits,routine"
-  PILOT_BRIEF: "brief.md"     # Path to user brief (relative to .pilot/prd/)
-  PILOT_PRD_OUTPUT: "prd.md"  # Where to write the PRD (relative to project root)
+  PILOT_KEYWORDS: ""                       # Comma-separated: "habit tracker,daily habits,routine"
+  PILOT_NUM_TOP_APPS: "5"
+  PILOT_APPTWEAK_OUTPUT_DIR: "data/competitors"
+  PILOT_BRIEF: "brief.md"                 # Path to user brief (relative to config dir)
+  PILOT_PRD_OUTPUT: "prd.md"              # Where to write the PRD (relative to project root)
 
 pre_pipeline: |
   {{file:scripts/pre_pipeline.sh}}
@@ -21,7 +23,7 @@ stages:
     on_signal:
       ready: analyze
       failed: __fail__
-      default: gather
+      default: __succeed__
 
   analyze:
     prompt: |

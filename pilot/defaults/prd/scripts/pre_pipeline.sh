@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Install apptweak-fetch, validate prerequisites.
+# Install apptweak-fetch if not present.
+# PILOT_CONFIG_DIR is set by the engine (absolute path to pipeline dir).
 
-APPTWEAK_DIR="${APPTWEAK_DIR:-.apptweak}"
+APPTWEAK_DIR="$PILOT_CONFIG_DIR/.apptweak"
 
-# Install
 if [ ! -f "$APPTWEAK_DIR/fetch.sh" ]; then
   echo "Installing apptweak-fetch..."
-  curl -fsSL https://raw.githubusercontent.com/akopanev/apptweak-fetch/main/install.sh | bash -s -- "$APPTWEAK_DIR"
+  curl -fsSL https://raw.githubusercontent.com/akopanev/apptweak-fetch/master/install.sh | bash -s -- "$APPTWEAK_DIR"
 fi
 
 echo "Pre-pipeline OK"

@@ -89,12 +89,15 @@ class PipelineEngine:
         return f"{seconds}s"
 
     def run(self) -> None:
+        # Export config dir so scripts can reference it regardless of CWD
+        os.environ["PILOT_CONFIG_DIR"] = os.path.abspath(self.config_dir)
+
         # Load .env (secrets) before anything
         self._load_env_file()
 
         # Pipeline pre_pipeline
         if self.config.pre_pipeline:
-            if not self._run_step("pre_pipeline", self.config.pre_pipeline):
+            if not self._run_step("pre_pipeline", self.config.pre_pipeline, show_output=True):
                 raise PipelineError("pre_pipeline failed")
 
         exit_status = "failed"
@@ -105,7 +108,7 @@ class PipelineEngine:
 
             # post_pipeline ALWAYS runs (cleanup)
             if self.config.post_pipeline:
-                if not self._run_step("post_pipeline", self.config.post_pipeline):
+                if not self._run_step("post_pipeline", self.config.post_pipeline, show_output=True):
                     self.display.warn("post_pipeline failed")
 
             # Clear state before conditional hooks (avoid stale state if chaining)
@@ -115,10 +118,10 @@ class PipelineEngine:
 
             # Conditional hooks (notify / chain)
             if exit_status == "success" and self.config.on_pipeline_success:
-                if not self._run_step("on_pipeline_success", self.config.on_pipeline_success):
+                if not self._run_step("on_pipeline_success", self.config.on_pipeline_success, show_output=True):
                     self.display.warn("on_pipeline_success failed")
             elif exit_status == "failed" and self.config.on_pipeline_failure:
-                if not self._run_step("on_pipeline_failure", self.config.on_pipeline_failure):
+                if not self._run_step("on_pipeline_failure", self.config.on_pipeline_failure, show_output=True):
                     self.display.warn("on_pipeline_failure failed")
 
     def _main_loop(self) -> str:
@@ -303,8 +306,13 @@ class PipelineEngine:
         else:
             self.display.domain_signal(sig.name, rich_escape(sig.content))
 
-    def _run_step(self, label: str, raw_command: str) -> bool:
-        """Run a shell command (pre_step / post_step). Returns True on success."""
+    def _run_step(self, label: str, raw_command: str,
+                  show_output: bool = False) -> bool:
+        """Run a shell command. Returns True on success.
+
+        show_output: True for pipeline hooks (always visible),
+                     False for stage pre/post steps (verbose only).
+        """
         try:
             command = resolve_templates(raw_command, self.config_dir, self.vars_path)
         except TemplateError as e:
@@ -322,7 +330,10 @@ class PipelineEngine:
 
         if proc.stdout:
             for line in proc.stdout.strip().splitlines():
-                self.display.executor_output(line)
+                if show_output:
+                    self.display.info(f"  [dim]{line}[/]")
+                else:
+                    self.display.executor_output(line)
         if proc.returncode != 0:
             if proc.stderr:
                 self.display.warn(f"{label} stderr: {proc.stderr.strip()}")
