@@ -10,7 +10,7 @@ vars:
   PILOT_REVIEW_PAGES: "5"                  # Pages per app (50 reviews/page, max 10)
   PILOT_FINDINGS: "data/findings.md"       # Feature baseline (output of baseline stage)
   PILOT_RESEARCH: "data/research.md"       # Web research (output of research stage)
-  PILOT_BRIEF: "brief.md"                 # User brief (relative to config dir)
+  PILOT_BRIEF: "brief.md"                 # User brief (optional, relative to config dir)
   PILOT_PRD: "data/prd.md"               # Final PRD (output of prd stage)
 
 pre_pipeline: |

@@ -1,6 +1,8 @@
 # Protocol: Web Research
 
-Deep web exploration — editorial reviews, Reddit, blog roundups, user complaints. When you find notable apps not in the top charts, research them in depth.
+Demand-side research — understand what users WANT, what jobs they're hiring
+apps for, what's broken, what works. Competitor features are evidence of
+demand, not the goal. Organize findings by user need, not by app.
 
 ## Signals
 - `<signal:update>message</signal:update>` — progress
@@ -17,28 +19,33 @@ Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}`
 
 ## Execution
 
-1. `<signal:update>researching: {{var:PILOT_KEYWORDS}}</signal:update>`
-2. Run web searches. For each keyword, search for:
+1. `<signal:update>researching demand: {{var:PILOT_KEYWORDS}}</signal:update>`
+2. **Search for user voice first.** For each keyword:
+   - `{keyword} app reddit` — what real users say
+   - `{keyword} frustrated reddit` / `"switched from" {keyword} app`
+   - `{keyword} app comparison` — what people weigh when choosing
    - `best {keyword} apps 2025` / `best {keyword} apps 2026`
-   - `{keyword} app reddit`
-   - `{keyword} app comparison`
    - `{keyword} app review`
-3. Read the top results. Collect features, pain points, trends.
-4. **For each notable app you discover** — go deep:
-   - Search for `"{app name}" app review`
-   - Read the app's website or App Store page if available
-   - Extract a full feature list — same detail level as if you'd seen the screenshots
-   - Note what makes it different from mainstream competitors
-5. Write `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}` in the format below.
-6. `<signal:completed>web research complete</signal:completed>`
+3. **Read results with a demand lens.** For every source, extract:
+   - What users say they WANT (explicit demand)
+   - What users complain about (unmet demand)
+   - What users praise (met demand — validated use case)
+   - Why users switch apps (demand the old app failed to meet)
+4. **For notable apps discovered** — research them, but through the demand
+   lens. Don't just list features. Ask: what demand does this app serve
+   that others don't? What do its users specifically love/hate?
+5. **Group everything by demand signal**, not by app. See output format.
+6. Write `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}` in the format below.
+7. `<signal:completed>web research complete</signal:completed>`
 
 ## What to Look For
 
-- **Apps not in top charts** — the most valuable find. Research each one in depth
-- **Features across the category** — what do blogs/reviewers highlight as important?
-- **User complaints** — what users hate (Reddit, app reviews). Direct quotes
-- **Emerging trends** — new approaches, AI features, social mechanics
-- **Retention patterns** — what keeps users, what causes churn
+- **What users want** — "I wish an app would...", "I need...", "looking for..."
+- **What's broken** — "I hate that...", "why can't any app...", "I switched because..."
+- **What works** — "I love that...", "finally an app that...", "this is why I pay for..."
+- **What competitors ship** — features across the category, as evidence of validated demand
+- **What makes users stay** — retention signals, the moments that hook people
+- **What makes users leave** — churn triggers, deal-breakers
 
 ## Output Format
 
@@ -48,51 +55,63 @@ Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}`
 > Keywords: ...
 > Sources searched: N
 
-## Notable Apps
+## Demand Signals
 
-For each app discovered that wasn't in the App Store top charts,
-write a full profile:
+Group findings by what users want — each signal is a user need or job-to-be-done.
+Order by strength of signal (how many sources, how passionately expressed).
 
-### [App Name]
+### [User Need / Job-to-be-Done]
 
-**What it is**: one sentence.
-**Rating**: if known | **Notable**: why it stood out
+**What users say**: direct quotes from Reddit, reviews, forums.
+Include 3-5 representative quotes that capture the demand.
 
-**Features**:
-- **Feature name** — what it does, how the user interacts with it
-- **Feature name** — ...
+**Evidence from competitors**: which apps address this need and how.
+Brief — app name + approach, not full feature lists.
 
-**What makes it different**: 1-2 sentences on unique angle.
+**Unmet demand**: what's still broken or missing. What users wish was better.
 
-### [Next App]
+### [Next User Need]
 ...
 
-## Additional Features
+## Pain Points
 
-Features mentioned across reviews/blogs that aren't tied to one specific app.
-Category-wide capabilities worth noting.
+Frustrations that cut across the category. These aren't tied to one need —
+they're universal complaints.
 
-- **Feature name** — what it does, where it was mentioned
+- **Pain point** — what users hate, direct quotes, how widespread
 
-## User Pain Points
+## What Works
 
-Common complaints across the category. Direct user quotes where possible.
+The moments users love. Evidence for what a good app in this category
+feels like.
 
-- **Pain point** — what users complain about, how widespread
+- **What works** — direct user language, which apps nail this
+
+## Notable Apps
+
+Apps discovered outside the top charts that are worth knowing about.
+Keep this brief — the demand signals above are the primary output.
+
+### [App Name]
+**What it is**: one sentence.
+**Why it's notable**: what demand it serves differently.
+**Key features**: only the ones relevant to demands identified above.
 
 ## Trends
 
-Emerging patterns gaining traction in the category.
+Emerging patterns. New approaches gaining traction.
 
-- **Trend** — what it is, where it's heading
+- **Trend** — what it is, what demand it responds to
 ```
 
 ## Rules
 
 | Rule | Constraint |
 |:-----|:-----------|
-| Go deep on new apps | Don't just list app names. Research each one — extract features with the same detail you'd want from screenshots |
+| Demand first | Organize by user need, not by app. Apps are evidence |
+| User voice | Direct quotes are the most valuable data. Collect as many as possible |
+| Competitor features = demand signal | "5/5 apps have X" means the market validated demand for X. Note it as evidence |
 | Source everything | Note where insights came from |
 | Recency matters | Prefer 2025-2026 sources. Ignore anything older than 2 years |
-| User voice | Direct user quotes from Reddit/reviews are valuable. Include them |
-| No recommendations | Report what you find. PRD stage makes the decisions |
+| Go deep on new apps | When you find a notable app, research it — but through the demand lens |
+| No recommendations | Report demand signals. Downstream stages make the decisions |
