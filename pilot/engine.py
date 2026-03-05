@@ -251,6 +251,7 @@ class PipelineEngine:
                     prompt, model=runner.model, known_signals=known,
                     on_output=self._on_output,
                     on_signal=self._on_signal,
+                    cancel=self.cancel,
                 )
                 if result.exit_code == 0:
                     return result

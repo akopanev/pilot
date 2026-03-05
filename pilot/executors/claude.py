@@ -51,7 +51,8 @@ class ClaudeExecutor:
     def run(self, prompt: str, model: str | None = None,
             known_signals: set[str] | None = None,
             on_output: callable = None,
-            on_signal: callable = None) -> ExecutorResult:
+            on_signal: callable = None,
+            cancel: "threading.Event | None" = None) -> ExecutorResult:
         cmd = [
             "claude", "--dangerously-skip-permissions",
             "--output-format", "stream-json", "--verbose",
@@ -77,6 +78,8 @@ class ClaudeExecutor:
 
         try:
             for line in proc.stdout:
+                if cancel and cancel.is_set():
+                    break
                 if not line.strip():
                     continue
 

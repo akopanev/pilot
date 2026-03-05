@@ -46,7 +46,28 @@ The ticket description IS the PRD epic section. Copy it faithfully.
 The decompose stage will read this ticket and break features into tasks —
 it needs the full scope, not a summary.
 
-7. `<signal:completed>N epics created</signal:completed>`
+7. **Wire epic-level build dependencies.** The PRD orders epics by product
+   priority (what matters most to the user). But build order is different —
+   you can't build onboarding before the screen it onboards into exists.
+
+   Think through which epics depend on which:
+   - Epic 000 (Foundation) has no deps — everything depends on it
+   - Feature epics that provide core functionality come next
+   - Epics that wrap or enhance other epics (onboarding, paywall) depend
+     on the epics they wrap
+   - Onboarding typically depends on the core feature epic it onboards
+     into — you build the product first, then the entrance
+
+   Use `tk dep` to wire these:
+   ```bash
+   tk dep [onboarding-id] [core-feature-id]   # can't onboard into what doesn't exist
+   tk dep [paywall-id] [onboarding-id]         # paywall shows after onboarding
+   tk dep [every-epic-id] [foundation-id]      # everything needs foundation
+   ```
+
+   Think carefully. Get this right — it determines the entire build order.
+
+8. `<signal:completed>N epics created, deps wired</signal:completed>`
 
 ## Rules
 
@@ -60,3 +81,6 @@ it needs the full scope, not a summary.
 | All at once | Create every epic in this stage. Don't leave any for later |
 | No tasks | Only create epic tickets. Tasks come in the decompose stage |
 | Order matters | Create in order: 000, 001, 002, ... N |
+| Build deps are mandatory | Wire `tk dep` between epics based on build order, not PRD order |
+| Think about what wraps what | Onboarding wraps core features → depends on them. Paywall wraps onboarding → depends on it |
+| Foundation is root | Every epic depends on Foundation |

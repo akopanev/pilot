@@ -22,7 +22,8 @@ class GenericExecutor:
     def run(self, prompt: str, model: str | None = None,
             known_signals: set[str] | None = None,
             on_output: callable = None,
-            on_signal: callable = None) -> ExecutorResult:
+            on_signal: callable = None,
+            cancel=None) -> ExecutorResult:
         cmd = [self.tool]
         if model:
             cmd.extend(["--model", model])
