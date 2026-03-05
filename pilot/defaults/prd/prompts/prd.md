@@ -55,7 +55,13 @@ in this order:
    Safari extensions, App Clips, or any other extension point. These are
    out of scope for MVP — no exceptions, even if every competitor has them.
 
-5. **Localization from day one.** All user-facing strings must be
+5. **React Native, cross-platform.** The app is built with React Native
+   targeting both iOS and Android from a single codebase. All features must
+   be designed for cross-platform compatibility. No platform-specific APIs
+   unless wrapped with a cross-platform abstraction. Native modules are
+   acceptable only when no React Native equivalent exists.
+
+6. **Localization from day one.** All user-facing strings must be
    localizable from the start. Default language is English. MVP ships
    with: English, Spanish, German, French, Portuguese, Dutch. This is a
    hard requirement — not a v1.1 item. The PRD should note this in the

@@ -5,8 +5,8 @@ version: "0.1"
 starting: create_epics
 
 vars:
-  PILOT_PRD: "data/prd.md"              # Input: PRD from the prd pipeline
-  PILOT_DOCS_DIR: "docs"                # Supporting docs (architecture, design, API specs, etc.)
+  PILOT_PRD: "../prd/data/prd.md"              # Input: PRD from the prd pipeline
+  PILOT_DOCS_DIR: "../../docs"                # Supporting docs (architecture, design, API specs, etc.)
 
 stages:
   # One-time: read PRD, create all epic tickets in tk
