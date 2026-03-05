@@ -165,7 +165,10 @@ What they see, what they feel, how quickly it happens.
 
 ## Epic 3: [Epic Name]
 
-**Goal**: one sentence — what user outcome this epic delivers.
+**Goal**: what user outcome this epic delivers AND why it matters for
+retention or the core use case. Not "add history" — instead "Users
+understand whether they're on track, and the streak mechanic creates
+a daily reason to return."
 
 ### Features
 

@@ -29,11 +29,22 @@ tk create "Epic 000: Foundation" \
   -t epic
 
 tk create "Epic 001: [Name from PRD]" \
-  -d "[Goal from PRD]" \
+  -d "[full epic content — see format below]" \
   -t epic
 
 # ... repeat for all epics
 ```
+
+**Description format**: the epic ticket must be self-contained. Include
+the full epic section from the PRD:
+
+- **Goal** — the outcome line
+- **Feature list** — every feature with its What, Scope, and User stories
+- **Any epic-specific details** (onboarding flow steps, paywall rules, etc.)
+
+The ticket description IS the PRD epic section. Copy it faithfully.
+The decompose stage will read this ticket and break features into tasks —
+it needs the full scope, not a summary.
 
 7. `<signal:completed>N epics created</signal:completed>`
 
@@ -42,7 +53,9 @@ tk create "Epic 001: [Name from PRD]" \
 | Rule | Constraint |
 |:-----|:-----------|
 | Epic 000 is synthetic | Always create it. Derive description from what the PRD implies |
-| Everything else from PRD | Epic names, goals, ordering — all come from the PRD. Don't invent |
+| Everything else from PRD | Epic names, goals, features, ordering — all come from the PRD. Don't invent |
+| Full content in ticket | Copy the entire epic section from PRD into the ticket description. Features, scope, user stories — all of it |
+| Ticket = PRD section | The decompose stage reads the ticket, not the PRD. The ticket must have everything |
 | 3-digit numbering | Always zero-pad: Epic 000, Epic 001, ..., Epic 099. Ensures correct sort |
 | All at once | Create every epic in this stage. Don't leave any for later |
 | No tasks | Only create epic tickets. Tasks come in the decompose stage |
