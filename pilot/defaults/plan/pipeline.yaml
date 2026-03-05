@@ -1,6 +1,6 @@
 # Plan pipeline — PRD → epics → tasks, one epic per round
 # Setup: create_epics (once)
-# Loop:  pick_epic → decompose → tickets → pick_epic → ... → done
+# Loop:  pick_epic → decompose → pick_epic → ... → done
 version: "0.1"
 starting: create_epics
 
@@ -15,7 +15,7 @@ stages:
       {{file:prompts/create_epics.md}}
     runner:
       executor: claude-code
-      model: opus
+      model: sonnet
     on_signal:
       completed: pick_epic
       default: __fail__
@@ -31,7 +31,7 @@ stages:
       completed: __succeed__      # all epics have tasks — done
       default: __fail__
 
-  # Think: decompose one epic into tasks
+  # Think + create: decompose one epic, spawn parallel agents to create tickets
   decompose:
     prompt: |
       {{file:prompts/decompose.md}}
@@ -39,16 +39,5 @@ stages:
       executor: claude-code
       model: opus
     on_signal:
-      completed: tickets
-      default: __fail__
-
-  # Execute: create tk tasks for the decomposed epic
-  tickets:
-    prompt: |
-      {{file:prompts/tickets.md}}
-    runner:
-      executor: claude-code
-      model: opus
-    on_signal:
-      completed: pick_epic        # loop back
+      completed: pick_epic        # loop back for next epic
       default: __fail__

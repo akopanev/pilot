@@ -19,8 +19,12 @@ PARENTS_WITH_TASKS=$(tk query 2>/dev/null | jq -r 'select(.type == "task" and .p
 # Find the first epic that has no child tasks
 while read -r epic_id; do
   if ! echo "$PARENTS_WITH_TASKS" | grep -qF "$epic_id"; then
-    # Get title from ticket body (first # heading)
-    TITLE=$(tk show "$epic_id" 2>/dev/null | grep -m1 '^# ' | sed 's/^# //')
+    # Get full ticket content
+    CONTENT=$(tk show "$epic_id" 2>/dev/null | sed '1,/^---$/d')
+    TITLE=$(echo "$CONTENT" | grep -m1 '^# ' | sed 's/^# //')
+    echo "<signal:var key=PILOT_CURRENT_EPIC>$epic_id</signal:var>"
+    echo "<signal:var key=PILOT_CURRENT_EPIC_TITLE>$TITLE</signal:var>"
+    echo "<signal:var key=PILOT_CURRENT_EPIC_CONTENT>$CONTENT</signal:var>"
     echo "<signal:ready>$epic_id|$TITLE</signal:ready>"
     exit 0
   fi
