@@ -55,6 +55,13 @@ in this order:
    Safari extensions, App Clips, or any other extension point. These are
    out of scope for MVP — no exceptions, even if every competitor has them.
 
+5. **Localization from day one.** All user-facing strings must be
+   localizable from the start. Default language is English. MVP ships
+   with: English, Spanish, German, French, Portuguese, Dutch. This is a
+   hard requirement — not a v1.1 item. The PRD should note this in the
+   Overview or as a cross-cutting concern so engineers build with
+   localization infrastructure from the first commit.
+
 ---
 
 ## Onboarding Principles
@@ -67,7 +74,13 @@ Apply these when writing Epic 1. They are not optional.
   tooltip tours, no "welcome to the app" screens. Get users into the core
   experience immediately.
 - **Remove every blocker to the aha moment.** Every screen between signup
-  and value is a potential drop-off. Ruthlessly cut steps.
+  and value is a potential drop-off. Cut steps that don't earn their place.
+  But note: more screens is not the problem — friction is. **10+ onboarding
+  screens is totally fine** as long as each one is fast, purposeful, and
+  moves the user forward. Short, focused screens (one question each, big
+  tap targets) convert better than fewer screens crammed with fields.
+  Focus your detail on the KEY screens — the ones that deliver aha moments
+  or collect inputs critical to personalization.
 - **Design like a game tutorial.** Progressive disclosure — teach by letting
   the user do, not by telling. Reward early actions.
 - **Request permissions in context.** Never ask for notifications, health,
@@ -167,6 +180,10 @@ What they see, what they feel, how quickly it happens.
 
 #### F2: Feature Name
 - ...
+
+#### Localization (if epic adds user-facing strings)
+- Update/add localized strings for all features in this epic across all
+  supported languages (English, Spanish, German, French, Portuguese, Dutch).
 
 ---
 

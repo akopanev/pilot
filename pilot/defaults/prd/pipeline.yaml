@@ -62,7 +62,7 @@ stages:
       {{file:prompts/baseline.md}}
     runner:
       executor: claude-code
-      model: sonnet
+      model: opus
     on_signal:
       completed: prd
       default: __fail__

@@ -1,0 +1,54 @@
+# Plan pipeline — PRD → epics → tasks, one epic per round
+# Setup: create_epics (once)
+# Loop:  pick_epic → decompose → tickets → pick_epic → ... → done
+version: "0.1"
+starting: create_epics
+
+vars:
+  PILOT_PRD: "data/prd.md"              # Input: PRD from the prd pipeline
+  PILOT_DOCS_DIR: "docs"                # Supporting docs (architecture, design, API specs, etc.)
+
+stages:
+  # One-time: read PRD, create all epic tickets in tk
+  create_epics:
+    prompt: |
+      {{file:prompts/create_epics.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: pick_epic
+      default: __fail__
+
+  # Shell: find next epic that has no child tasks
+  pick_epic:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/pick_epic.sh}}
+    on_signal:
+      ready: decompose            # epic needs tasks
+      completed: __succeed__      # all epics have tasks — done
+      default: __fail__
+
+  # Think: decompose one epic into tasks
+  decompose:
+    prompt: |
+      {{file:prompts/decompose.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: tickets
+      default: __fail__
+
+  # Execute: create tk tasks for the decomposed epic
+  tickets:
+    prompt: |
+      {{file:prompts/tickets.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: pick_epic        # loop back
+      default: __fail__
