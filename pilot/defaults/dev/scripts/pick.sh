@@ -38,7 +38,7 @@ if [ -n "${PILOT_EPIC:-}" ]; then
   while read -r line; do
     TID=$(echo "$line" | awk '{print $1}')
     [ -z "$TID" ] && continue
-    PARENT=$(tk query "[.[] | select(.id == \"$TID\")][0].parent // empty" 2>/dev/null || true)
+    PARENT=$(tk query 2>/dev/null | jq -r "select(.id == \"$TID\") | .parent // empty" || true)
     if [ "$PARENT" = "$PILOT_EPIC" ]; then
       TASK="$TID"
       break
@@ -51,7 +51,7 @@ fi
 if [ -z "$TASK" ]; then
   if [ -n "${PILOT_EPIC:-}" ]; then
     # Check if all epic tasks are closed (done) vs blocked (stuck)
-    OPEN=$(tk query "[.[] | select(.parent == \"$PILOT_EPIC\" and .status != \"closed\")] | length" 2>/dev/null || echo "0")
+    OPEN=$(tk query 2>/dev/null | jq -r "select(.parent == \"$PILOT_EPIC\" and .status != \"closed\")" | wc -l | tr -d ' ')
     if [ "$OPEN" = "0" ]; then
       echo "<signal:completed>epic done</signal:completed>"
     else
@@ -73,8 +73,8 @@ BRANCH="feat/$TASK"
 git checkout -B "$BRANCH"
 
 if [ -n "${PILOT_EPIC:-}" ]; then
-  TOTAL=$(tk query "[.[] | select(.parent == \"$PILOT_EPIC\")] | length" 2>/dev/null || echo "0")
-  CLOSED=$(tk query "[.[] | select(.parent == \"$PILOT_EPIC\" and .status == \"closed\")] | length" 2>/dev/null || echo "0")
+  TOTAL=$(tk query 2>/dev/null | jq -r "select(.parent == \"$PILOT_EPIC\")" | wc -l | tr -d ' ')
+  CLOSED=$(tk query 2>/dev/null | jq -r "select(.parent == \"$PILOT_EPIC\" and .status == \"closed\")" | wc -l | tr -d ' ')
 else
   TOTAL=$(tk ls 2>/dev/null | wc -l | tr -d ' ')
   CLOSED=$(tk ls --status closed 2>/dev/null | wc -l | tr -d ' ')

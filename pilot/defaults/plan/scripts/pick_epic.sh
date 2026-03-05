@@ -2,29 +2,26 @@
 set -euo pipefail
 
 # Find the next epic ticket that has no child tasks yet.
-# Epics are sorted by title (Epic 0, Epic 1, ...) so we process in order.
+# tk query outputs JSONL (one JSON object per line).
+# Title lives in the markdown body, not in JSON — we use tk show to get it.
 
-# Get all epic tickets as JSON, sorted by title
-EPICS_JSON=$(tk query '[.[] | select(.type == "epic" and .status != "closed")] | sort_by(.title)')
+# Get all open epic IDs, sorted by ID (creation order)
+EPIC_IDS=$(tk query 2>/dev/null | jq -r 'select(.type == "epic" and .status != "closed") | .id' | sort)
 
-if [ "$EPICS_JSON" = "[]" ] || [ -z "$EPICS_JSON" ]; then
+if [ -z "$EPIC_IDS" ]; then
   echo "<signal:failed>no epic tickets found — run create_epics first</signal:failed>"
   exit 1
 fi
 
-# For each epic, check if it has child tasks
-EPIC_IDS=$(echo "$EPICS_JSON" | python3 -c "
-import json, sys
-epics = json.load(sys.stdin)
-for e in epics:
-    print(e['id'] + '|' + e['title'])
-")
+# Get all task parent IDs (epics that already have children)
+PARENTS_WITH_TASKS=$(tk query 2>/dev/null | jq -r 'select(.type == "task" and .parent != null) | .parent' | sort -u)
 
-while IFS='|' read -r epic_id epic_title; do
-  # Check if any tasks have this epic as parent
-  CHILD_COUNT=$(tk query "[.[] | select(.parent == \"$epic_id\")] | length")
-  if [ "$CHILD_COUNT" = "0" ]; then
-    echo "<signal:ready>$epic_id|$epic_title</signal:ready>"
+# Find the first epic that has no child tasks
+while read -r epic_id; do
+  if ! echo "$PARENTS_WITH_TASKS" | grep -qF "$epic_id"; then
+    # Get title from ticket body (first # heading)
+    TITLE=$(tk show "$epic_id" 2>/dev/null | grep -m1 '^# ' | sed 's/^# //')
+    echo "<signal:ready>$epic_id|$TITLE</signal:ready>"
     exit 0
   fi
 done <<< "$EPIC_IDS"
