@@ -42,7 +42,7 @@ stages:
       {{file:prompts/research.md}}
     runner:
       executor: claude-code
-      model: sonnet
+      model: opus
     on_signal:
       completed: analyze
       default: __fail__

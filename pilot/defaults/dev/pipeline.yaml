@@ -5,6 +5,7 @@ starting: pick
 # Exported as env vars every round (key = var name)
 vars:
   PILOT_DEFAULT_BRANCH: master
+  PILOT_EPIC: ""                         # Epic ticket ID to work on (e.g., "tk-a1b2"). Tasks outside this epic are ignored.
 
 stages:
   # Pick next task from tracker, create feature branch

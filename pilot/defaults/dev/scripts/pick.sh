@@ -31,11 +31,35 @@ fi
 git checkout "$PILOT_DEFAULT_BRANCH" --quiet 2>/dev/null || true
 git pull --ff-only --quiet 2>/dev/null || true
 
-# Pick
-TASK=$(tk ready 2>/dev/null | awk 'NR==1{print $1}' || true)
+# Pick — scoped to epic if PILOT_EPIC is set
+if [ -n "${PILOT_EPIC:-}" ]; then
+  # Get ready task IDs, then find the first one parented to this epic
+  TASK=""
+  while read -r line; do
+    TID=$(echo "$line" | awk '{print $1}')
+    [ -z "$TID" ] && continue
+    PARENT=$(tk query "[.[] | select(.id == \"$TID\")][0].parent // empty" 2>/dev/null || true)
+    if [ "$PARENT" = "$PILOT_EPIC" ]; then
+      TASK="$TID"
+      break
+    fi
+  done < <(tk ready 2>/dev/null)
+else
+  TASK=$(tk ready 2>/dev/null | awk 'NR==1{print $1}' || true)
+fi
 
 if [ -z "$TASK" ]; then
-  echo "<signal:completed>no tasks</signal:completed>"
+  if [ -n "${PILOT_EPIC:-}" ]; then
+    # Check if all epic tasks are closed (done) vs blocked (stuck)
+    OPEN=$(tk query "[.[] | select(.parent == \"$PILOT_EPIC\" and .status != \"closed\")] | length" 2>/dev/null || echo "0")
+    if [ "$OPEN" = "0" ]; then
+      echo "<signal:completed>epic done</signal:completed>"
+    else
+      echo "<signal:completed>no ready tasks in epic (${OPEN} blocked)</signal:completed>"
+    fi
+  else
+    echo "<signal:completed>no tasks</signal:completed>"
+  fi
   exit 0
 fi
 
@@ -48,8 +72,13 @@ git commit -m "$TASK: start" --quiet
 BRANCH="feat/$TASK"
 git checkout -B "$BRANCH"
 
-TOTAL=$(tk ls 2>/dev/null | wc -l | tr -d ' ')
-CLOSED=$(tk ls --status closed 2>/dev/null | wc -l | tr -d ' ')
+if [ -n "${PILOT_EPIC:-}" ]; then
+  TOTAL=$(tk query "[.[] | select(.parent == \"$PILOT_EPIC\")] | length" 2>/dev/null || echo "0")
+  CLOSED=$(tk query "[.[] | select(.parent == \"$PILOT_EPIC\" and .status == \"closed\")] | length" 2>/dev/null || echo "0")
+else
+  TOTAL=$(tk ls 2>/dev/null | wc -l | tr -d ' ')
+  CLOSED=$(tk ls --status closed 2>/dev/null | wc -l | tr -d ' ')
+fi
 REMAINING=$((TOTAL - CLOSED))
 echo "<signal:update>$REMAINING / $TOTAL tasks remaining</signal:update>"
 echo "<signal:var key=PILOT_TASK_ID>$TASK</signal:var>"
