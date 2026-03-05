@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import os
-import signal
 import subprocess
 import threading
 
-from pilot.executors.result import ExecutorResult
+from pilot.executors.result import ExecutorResult, kill_process_group, start_cancel_watchdog
 from pilot.signals import SignalScanner
 
 
@@ -46,6 +45,8 @@ class CodexExecutor:
             start_new_session=True,
         )
 
+        start_cancel_watchdog(cancel, proc)
+
         stderr_result: dict = {"last_lines": [], "error": None}
         stderr_thread = threading.Thread(
             target=self._process_stderr,
@@ -74,7 +75,7 @@ class CodexExecutor:
             stdout_error = str(e)
         finally:
             if proc.poll() is None:
-                _kill_process_group(proc)
+                kill_process_group(proc)
             stderr_thread.join(timeout=5)
             proc.wait()
 
@@ -131,16 +132,3 @@ class CodexExecutor:
             result["error"] = str(e)
 
         result["last_lines"] = tail
-
-
-def _kill_process_group(proc: subprocess.Popen) -> None:
-    """Graceful shutdown: SIGTERM -> wait -> SIGKILL."""
-    try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        proc.wait(timeout=5)
-    except (ProcessLookupError, subprocess.TimeoutExpired):
-        try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        proc.wait()

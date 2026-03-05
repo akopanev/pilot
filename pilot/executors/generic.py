@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import os
-import signal
 import subprocess
 
 from pilot.signals import SignalScanner
-from pilot.executors.result import ExecutorResult
+from pilot.executors.result import ExecutorResult, kill_process_group, start_cancel_watchdog
 
 
 class GenericExecutor:
@@ -37,6 +35,8 @@ class GenericExecutor:
             start_new_session=True,
         )
 
+        start_cancel_watchdog(cancel, proc)
+
         output_parts: list[str] = []
         all_signals = []
         scanner = SignalScanner(known_signals)
@@ -52,7 +52,7 @@ class GenericExecutor:
                         on_signal(sig)
         finally:
             if proc.poll() is None:
-                _kill_process_group(proc)
+                kill_process_group(proc)
             proc.wait()
 
         # Flush remaining buffered signals
@@ -69,16 +69,3 @@ class GenericExecutor:
             error=None if proc.returncode == 0 else f"exit code {proc.returncode}",
             signals=all_signals,
         )
-
-
-def _kill_process_group(proc: subprocess.Popen) -> None:
-    """Graceful shutdown: SIGTERM -> wait -> SIGKILL."""
-    try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        proc.wait(timeout=5)
-    except (ProcessLookupError, subprocess.TimeoutExpired):
-        try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        proc.wait()
