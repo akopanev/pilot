@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 
 from pilot.signals import parse_signals
@@ -19,11 +20,25 @@ class ShellExecutor:
             on_output: callable = None,
             on_signal: callable = None,
             cancel=None) -> ExecutorResult:
+        env = {
+            **os.environ,
+            # Force non-interactive for all tools
+            "DEBIAN_FRONTEND": "noninteractive",
+            "CI": "true",
+            "NONINTERACTIVE": "1",
+            # Specific tools that prompt
+            "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0",
+            "npm_config_yes": "true",
+            "YARN_ENABLE_IMMUTABLE_INSTALLS": "false",
+            "COCOAPODS_DISABLE_STATS": "true",
+        }
         proc = subprocess.Popen(
             ["bash", "-c", prompt],
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            env=env,
         )
 
         lines: list[str] = []
