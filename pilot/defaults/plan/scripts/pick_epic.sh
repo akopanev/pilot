@@ -26,7 +26,7 @@ while IFS='|' read -r title eid; do
   [ -z "$eid" ] && continue
   echo "$HAS_TASKS" | grep -qF "$eid" && continue
 
-  CONTENT=$(tk show "$eid" 2>/dev/null | sed '1,/^---$/d')
+  CONTENT=$(tk show "$eid" 2>/dev/null | awk '/^---$/{n++; next} n>=2')
   echo "<signal:var key=PILOT_CURRENT_EPIC>$eid</signal:var>"
   echo "<signal:var key=PILOT_CURRENT_EPIC_TITLE>$title</signal:var>"
   echo "<signal:var key=PILOT_CURRENT_EPIC_CONTENT>$CONTENT</signal:var>"

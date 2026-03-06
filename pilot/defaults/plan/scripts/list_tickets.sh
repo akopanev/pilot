@@ -39,7 +39,7 @@ while read -r tid; do
   PARENT=$(echo "$META" | cut -f3)
 
   # Get title from markdown (first # heading after ---)
-  TITLE=$(tk show "$tid" 2>/dev/null | sed '1,/^---$/d' | grep -m1 '^# ' | sed 's/^# //')
+  TITLE=$(tk show "$tid" 2>/dev/null | awk '/^---$/{n++; next} n>=2' | grep -m1 '^# ' | sed 's/^# //')
 
   # Task count
   COUNT=$(echo "$TASK_COUNTS" | grep "^${tid}	" | cut -f2)
