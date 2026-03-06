@@ -24,26 +24,30 @@ TASK_COUNTS=$(echo "$ALL" | jq -rs '
   map(.[0] + "\t" + (length | tostring)) | .[]
 ')
 
-# Print header
-printf "%-10s  %-6s  %-8s  %-10s  %5s  %s\n" "ID" "TYPE" "STATUS" "EPIC" "TASKS" "TITLE"
-printf "%-10s  %-6s  %-8s  %-10s  %5s  %s\n" "----------" "------" "--------" "----------" "-----" "------------------------------------"
-
-# For each ticket: get title from tk show (first # heading after frontmatter)
+# Collect rows as tab-separated, then sort and format
+ROWS=""
 while read -r tid; do
   [ -z "$tid" ] && continue
 
-  # Get metadata from JSON
   META=$(echo "$ALL" | jq -r --arg id "$tid" 'select(.id == $id) | [.type, .status, (.parent // "-")] | @tsv')
   TTYPE=$(echo "$META" | cut -f1)
   STATUS=$(echo "$META" | cut -f2)
   PARENT=$(echo "$META" | cut -f3)
 
-  # Get title from markdown (first # heading after ---)
   TITLE=$(tk show "$tid" 2>/dev/null | awk '/^---$/{n++; next} n>=2' | grep -m1 '^# ' | sed 's/^# //')
 
-  # Task count
-  COUNT=$(echo "$TASK_COUNTS" | grep "^${tid}	" | cut -f2)
+  COUNT=$(echo "$TASK_COUNTS" | grep "^${tid}	" | cut -f2 || true)
   [ -z "$COUNT" ] && COUNT=0
 
-  printf "%-10s  %-6s  %-8s  %-10s  %5s  %s\n" "$tid" "$TTYPE" "$STATUS" "$PARENT" "$COUNT" "$TITLE"
-done <<< "$IDS" | sort -k7
+  ROWS+="${TITLE}	${tid}	${TTYPE}	${STATUS}	${PARENT}	${COUNT}
+"
+done <<< "$IDS"
+
+# Header + sorted rows (sorted by title via first column, then reformatted)
+{
+  printf "%s\t%s\t%s\t%s\t%s\t%s\n" "ID" "TYPE" "STATUS" "EPIC" "TASKS" "TITLE"
+  echo "$ROWS" | sort | while IFS=$'\t' read -r title tid ttype status parent count; do
+    [ -z "$tid" ] && continue
+    printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$tid" "$ttype" "$status" "$parent" "$count" "$title"
+  done
+} | column -t -s $'\t'

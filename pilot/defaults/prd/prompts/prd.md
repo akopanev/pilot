@@ -37,9 +37,12 @@ in this order:
 
 1. **Epic 1 is always Foundation.** Project scaffolding, core data models,
    base navigation shell, localization infrastructure, and any setup that
-   all feature epics depend on. This is a technical epic — no user-facing
-   features, just the skeleton the product is built on. Derive its scope
-   from what the feature epics need.
+   all feature epics depend on. This is a **technical-only** epic — no
+   user-facing screens, no UI features, no settings editors, no forms.
+   Just the skeleton: project init, shared types/models, empty navigation
+   tabs, i18n wiring, auth skeleton. If a user can interact with it
+   beyond navigating between empty tabs, it belongs in a feature epic.
+   Derive its scope from what the feature epics need.
 
 2. **Feature epics come next.** All product features are grouped into
    epics ordered by impact on the core use cases. Each epic is a plannable
@@ -132,16 +135,21 @@ Keep it concrete — one paragraph.
 
 ## Epic 1: Foundation
 
-**Goal**: Project scaffolding, core data models, base navigation shell,
-and infrastructure that all feature epics depend on.
+**Goal**: Technical scaffolding only. No user-facing features.
 
 - **Project setup**: tooling, directory structure, CI/CD skeleton.
   pnpm with `node-linker=hoisted` in `.npmrc` (required for React Native
   + CocoaPods compatibility)
-- **Core data models**: entities that multiple epics share
-- **Base navigation**: tab bar / router shell (empty screens are fine)
-- **Localization infrastructure**: i18n setup, string extraction pipeline
+- **Core data models**: shared types and entities (TypeScript types, DB schema)
+- **Base navigation**: tab bar / router shell with **empty placeholder screens**
+- **Localization infrastructure**: i18n setup, string extraction pipeline,
+  Foundation-only strings (tab labels, common actions)
 - **Auth skeleton**: sign-up / sign-in flow if applicable
+- **Theme setup**: design tokens, provider, light/dark mode
+
+**NOT in Foundation**: settings UI, profile editors, forms, toggles,
+pickers, save flows, or any screen where a user does something beyond
+seeing a placeholder. Those belong in feature epics.
 
 Keep this minimal — only what's needed for the first feature epic to start.
 
@@ -266,6 +274,26 @@ Features from the baseline that are NOT in MVP, with reason.
 
 - **Feature name** — reason for deferral (e.g., "only 1 of 5 competitors
   has it", "requires watch app extension", "nice-to-have, not core")
+
+## Design Direction
+
+Before running the design pipeline, prepare a design brief with visual
+references. This section tells the human WHAT to collect.
+
+**Mood**: 3-5 adjectives describing the desired feel (e.g., calm, minimal,
+premium, playful, bold). Derived from the app category and target user.
+
+**Reference areas**: List the 2-4 screen types that benefit most from
+visual references. For each, suggest what to look for:
+- e.g., "Dashboard — look for apps with clean progress visualization"
+- e.g., "Onboarding — look for apps with minimal, one-thing-per-screen flows"
+
+**Notes**: Any aesthetic observations from the competitor research —
+common visual patterns, color tendencies in the category, density norms.
+
+_The human places screenshots and notes in `.pilot/design/brief.md`
+before running the design pipeline. This section helps them know what
+to look for._
 
 ## Open Questions
 Decisions that need human input before development starts.

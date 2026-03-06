@@ -1,4 +1,4 @@
-"""Shell executor — runs commands/scripts, parses signals from stdout."""
+"""Shell executor — runs commands/scripts, streams stdout in real-time."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pilot.executors.result import ExecutorResult
 class ShellExecutor:
     """Runs shell commands. The 'prompt' is the command to execute.
 
-    Signals are parsed from stdout (e.g. echo "<signal:ready>task-id").
+    Signals are parsed from stdout in real-time as lines arrive.
     """
 
     def run(self, prompt: str, model: str | None = None,
@@ -19,26 +19,37 @@ class ShellExecutor:
             on_output: callable = None,
             on_signal: callable = None,
             cancel=None) -> ExecutorResult:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             ["bash", "-c", prompt],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
         )
 
-        output = proc.stdout
-        signals = parse_signals(output, known_signals)
-        if on_signal:
-            for sig in signals:
-                on_signal(sig)
-        # Log non-signal lines only (signals already displayed via on_signal)
-        if on_output and output:
-            for line in output.splitlines():
-                if line.strip() and "<signal:" not in line:
-                    on_output(line)
+        lines: list[str] = []
+        all_signals = []
 
+        for line in proc.stdout:
+            line = line.rstrip("\n")
+            lines.append(line)
+
+            # Parse signals from this line
+            sigs = parse_signals(line, known_signals)
+            if sigs:
+                all_signals.extend(sigs)
+                if on_signal:
+                    for sig in sigs:
+                        on_signal(sig)
+            elif line.strip() and on_output:
+                on_output(line)
+
+        proc.wait()
+        stderr = proc.stderr.read() if proc.stderr else ""
+
+        output = "\n".join(lines)
         return ExecutorResult(
             output=output,
             exit_code=proc.returncode,
-            error=proc.stderr.strip() if proc.returncode != 0 else None,
-            signals=signals,
+            error=stderr.strip() if proc.returncode != 0 else None,
+            signals=all_signals,
         )
