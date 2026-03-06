@@ -15,20 +15,23 @@ this stage. Your job is to review the code — not re-run the checks.
 
 ## Steps
 
-1. `tk show {{var:PILOT_TASK_ID}}` — read task, acceptance criteria, and ALL prior notes.
+1. `tk show {{var:PILOT_TASK_ID}}` — read the full ticket: what to build,
+   how it fits, acceptance criteria (with check commands), out of scope,
+   and ALL prior notes.
 2. `<signal:update>review: {{var:PILOT_TASK_ID}}</signal:update>`
 3. `git checkout {{var:PILOT_WORKING_BRANCH}}`
 4. `git diff {{var:PILOT_DEFAULT_BRANCH}}...HEAD` — read the diff.
 5. Read every changed file in full. Not just the diff — the whole file.
 6. **Judge**:
-   - **Task match**: Does the code do what the ticket says? Check every
-     acceptance criterion.
+   - **Task match**: Does the code satisfy every acceptance criterion in the
+     ticket? Go through them one by one.
    - **Logic**: Will it work at runtime? Off-by-one, null refs, race conditions,
      edge cases — the bugs that tests don't catch.
    - **Regressions**: Did it break existing functionality? Removed code, broken
      imports, changed behavior of unrelated features.
    - **Scope**: Every changed file must be necessary for this task. Unrelated
-     refactors, style changes, "improvements" = FAIL.
+     refactors, style changes, "improvements" = FAIL. Check the ticket's
+     "out of scope" section.
 
 ## PASS
 

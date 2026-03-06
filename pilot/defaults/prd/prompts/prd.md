@@ -35,44 +35,52 @@ Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD}}`
 These are non-negotiable structural requirements. Every PRD must have them,
 in this order:
 
-1. **Epic 1 is always Onboarding.** The first 30 seconds of the product are
-   the primary driver for retention and word-of-mouth. Design the product
-   from the onboarding experience outward. See [Onboarding Principles](#onboarding-principles).
+1. **Epic 1 is always Foundation.** Project scaffolding, core data models,
+   base navigation shell, localization infrastructure, and any setup that
+   all feature epics depend on. This is a technical epic — no user-facing
+   features, just the skeleton the product is built on. Derive its scope
+   from what the feature epics need.
 
-2. **Epic 2 is always Monetization Gate (Paywall).** Immediately after
+2. **Feature epics come next.** All product features are grouped into
+   epics ordered by impact on the core use cases. Each epic is a plannable
+   unit — a set of related features that ship together. No flat feature
+   lists. Every feature belongs to exactly one epic.
+
+3. **Second-to-last epic is always Onboarding.** The first 30 seconds of
+   the product are the primary driver for retention and word-of-mouth.
+   Design the product from the onboarding experience outward. Onboarding
+   comes after feature epics because you build the product first, then the
+   entrance into it. See [Onboarding Principles](#onboarding-principles).
+
+4. **Last epic is always Monetization Gate (Paywall).** Immediately after
    onboarding, present a paywall with a prominent skip button. The user has
    just experienced the aha moment — this is the highest-intent conversion
    point. The skip button is mandatory: never block users from entering the
-   product.
+   product. Paywall is last because it wraps onboarding.
 
-3. **All remaining features are grouped into epics.** Each epic is a
-   plannable unit — a set of related features that ship together. No flat
-   feature lists. Every feature belongs to exactly one epic.
-
-4. **App only. No extensions.** The PRD covers the main app and nothing
+5. **App only. No extensions.** The PRD covers the main app and nothing
    else. Automatically defer any feature that requires a separate build
    target: Apple Watch apps, widgets, iMessage extensions, Siri intents,
    Safari extensions, App Clips, or any other extension point. These are
    out of scope for MVP — no exceptions, even if every competitor has them.
 
-5. **React Native, cross-platform.** The app is built with React Native
+6. **React Native, cross-platform.** The app is built with React Native
    targeting both iOS and Android from a single codebase. All features must
    be designed for cross-platform compatibility. No platform-specific APIs
    unless wrapped with a cross-platform abstraction. Native modules are
    acceptable only when no React Native equivalent exists.
 
-6. **Localization from day one.** All user-facing strings must be
-   localizable from the start. Default language is English. MVP ships
-   with: English, Spanish, German, French, Portuguese, Dutch. This is a
-   hard requirement — not a v1.1 item. The PRD should note this in the
-   Overview or as a cross-cutting concern so engineers build with
-   localization infrastructure from the first commit.
+7. **Localization from day one.** All user-facing strings must be
+   localizable from the start. MVP ships with: {{var:PILOT_LANGUAGES}}.
+   This is a hard requirement — not a v1.1 item. The PRD should note
+   this in the Overview or as a cross-cutting concern so engineers build
+   with localization infrastructure from the first commit.
 
 ---
 
 ## Onboarding Principles
 
-Apply these when writing Epic 1. They are not optional.
+Apply these when writing the Onboarding epic. They are not optional.
 
 - **Make the first 30 seconds magical.** Invest disproportionately in the
   first moments. This is the primary driver for word-of-mouth growth.
@@ -122,7 +130,56 @@ Keep it concrete — one paragraph.
 
 ---
 
-## Epic 1: Onboarding
+## Epic 1: Foundation
+
+**Goal**: Project scaffolding, core data models, base navigation shell,
+and infrastructure that all feature epics depend on.
+
+- **Project setup**: tooling, directory structure, CI/CD skeleton.
+  pnpm with `node-linker=hoisted` in `.npmrc` (required for React Native
+  + CocoaPods compatibility)
+- **Core data models**: entities that multiple epics share
+- **Base navigation**: tab bar / router shell (empty screens are fine)
+- **Localization infrastructure**: i18n setup, string extraction pipeline
+- **Auth skeleton**: sign-up / sign-in flow if applicable
+
+Keep this minimal — only what's needed for the first feature epic to start.
+
+---
+
+## Epic 2: [Epic Name]
+
+**Goal**: what user outcome this epic delivers AND why it matters for
+retention or the core use case. Not "add history" — instead "Users
+understand whether they're on track, and the streak mechanic creates
+a daily reason to return."
+
+### Features
+
+#### F1: Feature Name
+- **What**: what it does from the user's perspective. 2-3 sentences.
+- **Why MVP**: why this is in v1 (e.g., "all competitors have it",
+  "core to the value proposition", "needed for retention loop")
+- **Scope**: concrete boundaries — included vs. explicitly excluded.
+  Enough detail for an engineer to estimate.
+- **User stories**: 1-3 key user stories in "As a [user], I want [action]
+  so that [outcome]" format.
+
+#### F2: Feature Name
+- ...
+
+#### Localization (if epic adds user-facing strings)
+- Update/add localized strings for all features in this epic across all
+  supported languages ({{var:PILOT_LANGUAGES}}).
+
+---
+
+## Epic N: [Epic Name]
+(repeat feature epic structure)
+
+---
+
+## Epic N+1: Onboarding
 
 **Goal**: Get the user to the aha moment in under 30 seconds.
 
@@ -155,7 +212,7 @@ What they see, what they feel, how quickly it happens.
 
 ---
 
-## Epic 2: Monetization Gate
+## Epic N+2: Monetization Gate
 
 **Goal**: Convert high-intent users immediately after the aha moment.
 
@@ -169,41 +226,39 @@ What they see, what they feel, how quickly it happens.
 
 ---
 
-## Epic 3: [Epic Name]
+## Navigation & Screens
 
-**Goal**: what user outcome this epic delivers AND why it matters for
-retention or the core use case. Not "add history" — instead "Users
-understand whether they're on track, and the streak mechanic creates
-a daily reason to return."
+The user journey mapped to named screens. No visual details — just what
+exists, why, and how users move between them.
 
-### Features
+### Tabs
+| Tab | Label | Root Screen |
+|:----|:------|:------------|
+| 1 | Home | home_dashboard |
+| 2 | ... | ... |
 
-#### F1: Feature Name
-- **What**: what it does from the user's perspective. 2-3 sentences.
-- **Why MVP**: why this is in v1 (e.g., "all competitors have it",
-  "core to the value proposition", "needed for retention loop")
-- **Scope**: concrete boundaries — included vs. explicitly excluded.
-  Enough detail for an engineer to estimate.
-- **User stories**: 1-3 key user stories in "As a [user], I want [action]
-  so that [outcome]" format.
+### Key Flows
+Main user journeys as screen sequences:
+- **First launch**: onboarding_welcome → ... → paywall → home_dashboard
+- **Core action**: home_dashboard → [screen] → home_dashboard
+- **Settings**: settings → [sub-screen] → settings
 
-#### F2: Feature Name
-- ...
+### Screen Inventory
 
-#### Localization (if epic adds user-facing strings)
-- Update/add localized strings for all features in this epic across all
-  supported languages (English, Spanish, German, French, Portuguese, Dutch).
+| Screen ID | Epic | What the user does here | Comes from | Goes to |
+|:----------|:-----|:------------------------|:-----------|:--------|
+| onboarding_welcome | onboarding | Sees app promise, taps continue | app launch (first time) | onboarding_goal |
+| onboarding_goal | onboarding | Picks their goal | onboarding_welcome | onboarding_prefs |
+| paywall | paywall | Decides to subscribe or skip | onboarding complete | home_dashboard |
+| home_dashboard | [epic] | Sees today's progress, takes core action | paywall, tab bar | log_entry |
+| ... | ... | ... | ... | ... |
 
----
-
-## Epic N: [Epic Name]
-(repeat structure)
-
----
-
-## Navigation
-Recommended app structure based on competitor patterns from the baseline.
-Tab bar layout, main sections, key user flows.
+Rules:
+- One row per screen. Every screen belongs to one epic.
+- Screen IDs are snake_case — they become identifiers downstream.
+- Every user story must map to at least one screen.
+- Include settings, profile, edit screens — not just the happy path.
+- No layout, no visuals, no components. Just the journey.
 
 ## Deferred (v1.1+)
 
@@ -225,7 +280,7 @@ Group features into epics by user outcome, not by technical similarity.
 | One epic = one plannable unit | An epic should be shippable on its own |
 | 2-5 features per epic | Smaller = easier to plan and ship |
 | Name by user outcome | "Daily Tracking", not "Database Features" |
-| Order by priority | After Epic 1 (Onboarding) and Epic 2 (Paywall), order remaining epics by impact on retention |
+| Order by priority | Feature epics ordered by impact on retention, then Onboarding (second-to-last), then Paywall (last) |
 | Each feature in exactly one epic | No duplicates across epics |
 
 ## MVP Cut Line
@@ -275,8 +330,9 @@ so the cut decisions are traceable.
 | Shadow, don't innovate | Don't invent new features. Replicate what's proven |
 | Scope each feature | Every MVP feature needs concrete scope. "Add social features" is not scope |
 | Be decisive | Make the call on every feature. In or out, with rationale |
-| Onboarding is Epic 1 | Always. Non-negotiable. Apply the onboarding principles |
-| Paywall is Epic 2 | Always. Immediately after onboarding. Always has a skip button |
+| Foundation is Epic 1 | Always. Technical scaffolding, no user-facing features |
+| Onboarding is second-to-last | Always. Non-negotiable. Apply the onboarding principles |
+| Paywall is last | Always. Immediately after onboarding. Always has a skip button |
 | App only | No watch apps, widgets, extensions, App Clips, or any other separate build target. Always defer |
 | Epics, not flat lists | Every feature belongs to an epic. No orphan features |
 | User stories required | Each feature needs 1-3 user stories for downstream planning |

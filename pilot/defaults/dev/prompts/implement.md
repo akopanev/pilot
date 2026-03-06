@@ -10,19 +10,22 @@ Task: `{{var:PILOT_TASK_ID}}`
 
 ## Steps
 
-1. **Read task**: `tk show {{var:PILOT_TASK_ID}}`. Note acceptance criteria, scope,
-   and references.
+1. **Read task**: `tk show {{var:PILOT_TASK_ID}}`. The ticket contains:
+   - What to build (files, components, endpoints)
+   - How it fits (connections to other tasks/epics, patterns to follow)
+   - Acceptance criteria with exact check commands
+   - Out of scope (what NOT to touch)
 2. **Checkout**: `git checkout {{var:PILOT_WORKING_BRANCH}}`.
 3. **Read context**:
    - Prior work on branch? `git log --oneline -5` and `git diff` — understand before
      changing.
-   - Open files listed in References section.
+   - Open files referenced in the ticket description.
    - Read source files in scope and their surroundings — imports, types, tests,
      related components. Understand existing patterns.
 4. `<signal:update>implement: {{var:PILOT_TASK_ID}}</signal:update>`
 5. **Implement**: Write the code. Stay on task — every change must be necessary
    for this task to work. Don't refactor or improve unrelated code.
-6. **Verify**: Run the check commands from acceptance criteria (typecheck, lint, tests).
+6. **Verify**: Run the check commands listed in the ticket's acceptance criteria.
    If anything fails — read the error, fix the code, re-run.
    Repeat until clean. Up to 3 fix cycles. Then commit regardless.
 7. **Commit**: `git add . && git commit -m "{{var:PILOT_TASK_ID}}: <summary>"`

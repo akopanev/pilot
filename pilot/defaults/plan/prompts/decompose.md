@@ -11,6 +11,8 @@ parallel agents to create each ticket. Wire dependencies after.
 ## Inputs
 
 - **PRD**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD}}`
+- **Screen specs**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS}}`
+- **Theme**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_THEME}}`
 - **Supporting docs**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_DOCS_DIR}}/`
 - **Current epic ID**: `{{var:PILOT_CURRENT_EPIC}}`
 - **Current epic title**: `{{var:PILOT_CURRENT_EPIC_TITLE}}`
@@ -25,8 +27,11 @@ parallel agents to create each ticket. Wire dependencies after.
 ### Step 1: Read everything
 
 1. Read the PRD.
-2. List `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_DOCS_DIR}}/` and read EVERY file.
-3. Run `tk list` to see existing epics and tasks from previous rounds.
+2. Read screens.yaml — find screens belonging to this epic. These define
+   exactly what UI to build: layout, blocks, components, states.
+3. Read theme.yaml — colors, spacing, typography for implementation.
+4. List `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_DOCS_DIR}}/` and read EVERY file.
+5. Run `tk list` to see existing epics and tasks from previous rounds.
 4. `<signal:update>read PRD + N docs, decomposing {{var:PILOT_CURRENT_EPIC_TITLE}}</signal:update>`
 
 The epic's content is already in the prompt above — no need to read it from tk.
@@ -35,26 +40,42 @@ The epic's content is already in the prompt above — no need to read it from tk
 
 ### Step 2: Understand this epic
 
-**If Epic 000: Foundation** — synthesize from the docs. This covers:
-- Project scaffolding and tooling
-- Core data models / DB schema
-- Auth setup (if applicable)
-- Base navigation shell
-- Only what's needed for Epic 001 to start. Keep it minimal.
+The epic's content is your source of truth — it contains the goal,
+features, scope, and user stories. Decompose what's there. Don't add
+features, don't remove features, don't reinterpret scope.
 
-**All other epics** — find the epic in the PRD. It has a goal, features,
-scope, and user stories. Those are your source of truth.
+Use the PRD and docs for context: architecture patterns, tech stack,
+API contracts, navigation structure. This context informs HOW to
+decompose, not WHAT to decompose.
 
 ### Step 3: Decompose into tasks
 
-Break the epic into tasks. For each task, define:
+Break the epic into tasks. Each task must be **comprehensive** — an AI
+agent will implement it with NO context beyond the ticket itself. For
+each task, define:
 
-- **Title**: verb-first, specific. "Create water_logs table", not "Database"
-- **Outcome**: what is true when done. One sentence, verifiable.
+- **Title**: verb-first, specific. "Create water_logs table and API
+  endpoints", not "Database"
+- **Description**: a complete implementation brief:
+  - **What to build** — specific files to create/modify, components,
+    endpoints, schemas. Reference concrete paths from the docs and
+    existing codebase where applicable.
+  - **Screen spec** (for UI tasks) — copy the relevant screen's blocks,
+    components, and states from screens.yaml. Include theme tokens the
+    screen uses. The implement agent builds exactly what's specified here.
+  - **How it fits** — which other tasks/epics this connects to, what
+    data flows in and out, what existing patterns to follow (from docs).
+  - **Acceptance criteria** — numbered list of verifiable conditions.
+    Each criterion must be testable. Include the exact commands to run:
+    ```
+    AC1: Water log entries persist to SQLite — `pnpm test -- --grep "water_log"` passes
+    AC2: POST /api/logs returns 201 with valid payload — `pnpm typecheck` passes
+    AC3: No lint errors — `pnpm lint` passes
+    ```
+  - **Out of scope** — what NOT to touch. Prevents scope creep.
 - **Tags**: backend, mobile, db, api, ui, auth, etc.
 - **Depends on**: other tasks in this epic (by position: T1, T2...) or
   existing `tk` IDs for cross-epic deps (from `tk list`)
-- **Complexity**: S (few hours) / M (1 day) / L (2 days)
 
 **Sizing**: 0.5–2 days each. Split if bigger, merge if trivial.
 
@@ -75,7 +96,7 @@ Give each agent this prompt (fill in the actual values):
 Create a ticket using tk. Run this command and return ONLY the ticket ID:
 
 tk create "[Task Title]" \
-  -d "[Outcome]" \
+  -d "[Full description — what to build, how it fits, acceptance criteria, out of scope]" \
   -t task \
   --parent {{var:PILOT_CURRENT_EPIC}} \
   --tags [tags]
@@ -113,11 +134,12 @@ tk dep tree --full {{var:PILOT_CURRENT_EPIC}}
 | Rule | Constraint |
 |:-----|:-----------|
 | One epic only | Decompose `{{var:PILOT_CURRENT_EPIC_TITLE}}`, nothing else |
-| Lean tickets | Title + outcome + tags. No long descriptions |
-| Reference docs | Outcomes should cite specific paths, schemas, endpoints |
+| Self-contained tickets | Every ticket must have enough detail for an AI agent to implement it with NO other context |
+| Acceptance criteria required | Every task needs numbered, testable criteria with exact check commands |
+| Reference concrete paths | File paths, API endpoints, schema names — not vague descriptions |
 | Follow the PRD | Don't add or remove features. Decompose what's there |
 | Use real tk IDs | Cross-epic deps use actual IDs from `tk list` |
-| Foundation is minimal | Epic 000: only what Epic 001 needs |
+| Decompose, don't invent | Break down what the epic says. Don't add scope |
 | Vertical slices | End-to-end over layer-by-layer |
 | Right-sized | 0.5–2 days per task |
 | Parallel agents | Launch ALL ticket-creation agents in ONE message |

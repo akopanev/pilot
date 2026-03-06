@@ -25,7 +25,7 @@ could not resolve. You have full authority to override them.
    - Resolve contradictions — if the reviewer was wrong, override.
    - Apply any remaining actionable feedback.
    - `git add . && git commit -m "{{var:PILOT_TASK_ID}}: escalation fix"`
-7. **Verify** — run the check commands from acceptance criteria (typecheck, lint, tests).
+7. **Verify** — run the check commands from the ticket's acceptance criteria.
    All must pass before approving. Your `approve` bypasses the verify gate and goes
    straight to merge — you are the last check.
 8. **Decide**:

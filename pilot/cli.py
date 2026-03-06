@@ -5,9 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
-import signal
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -46,29 +44,17 @@ def cmd_run(args) -> None:
     display.info(f"[dim]Vars:[/]     {vars_path}")
     display.info(f"[dim]Stages:[/]   {', '.join(config.stages.keys())}")
 
-    cancel_event = threading.Event()
-
-    def _handle_signal(signum, frame):
-        cancel_event.set()
-        # Restore default handler so second CTRL+C raises KeyboardInterrupt
-        # and triggers executor cleanup (_kill_process_group)
-        signal.signal(signal.SIGINT, signal.default_int_handler)
-        signal.signal(signal.SIGTERM, signal.SIG_DFL)
-        display.warn("Stopping after current round... (press again to force)")
-
-    signal.signal(signal.SIGINT, _handle_signal)
-    signal.signal(signal.SIGTERM, _handle_signal)
-
     engine = PipelineEngine(
         config=config,
         config_dir=config_dir,
         state_path=state_path,
         vars_path=vars_path,
         display=display,
-        cancel_event=cancel_event,
     )
     try:
         engine.run()
+    except KeyboardInterrupt:
+        display.warn("Interrupted")
     finally:
         display.close()
 

@@ -1,0 +1,47 @@
+# Design pipeline — PRD → screens → theme → enriched screens + component mapping
+# Runs after PRD pipeline, before plan pipeline.
+# Pre-pipeline installs gluestack agent-skills for component knowledge.
+version: "0.1"
+starting: screens
+
+vars:
+  PILOT_PRD: "../prd/data/prd.md"
+  PILOT_APPTWEAK_OUTPUT_DIR: "../prd/data/competitors"
+  PILOT_SCREENS: "data/screens.yaml"
+  PILOT_THEME: "data/theme.yaml"
+  PILOT_COMPONENT_CATALOG: "../../docs/components.md"   # Project component catalog (optional)
+  PILOT_DESIGN_REFS: "../../design-refs"                # Reference designs — screenshots, mockups (optional)
+
+pre_pipeline: |
+  {{file:scripts/pre_pipeline.sh}}
+
+stages:
+  screens:
+    prompt: |
+      {{file:prompts/screens.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: theme
+      default: __fail__
+
+  theme:
+    prompt: |
+      {{file:prompts/theme.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: detail
+      default: __fail__
+
+  detail:
+    prompt: |
+      {{file:prompts/detail.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: __succeed__
+      default: __fail__

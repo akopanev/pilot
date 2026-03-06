@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import threading
 import time
 
 from pilot.display import Display
@@ -32,7 +31,6 @@ class PipelineEngine:
         state_path: str,
         vars_path: str,
         display: Display,
-        cancel_event: threading.Event | None = None,
         delay: float = 2.0,
     ):
         self.config = config
@@ -40,7 +38,6 @@ class PipelineEngine:
         self.state_path = state_path
         self.vars_path = vars_path
         self.display = display
-        self.cancel = cancel_event or threading.Event()
         self.delay = delay
         self.executors = ExecutorPool()
 
@@ -127,7 +124,7 @@ class PipelineEngine:
         round_num = 0
         pipeline_start = time.monotonic()
 
-        while not self.cancel.is_set():
+        while True:
             round_num += 1
             round_start = time.monotonic()
             self._sync_env()
@@ -227,8 +224,7 @@ class PipelineEngine:
             self.display.transition(old_stage, transition.to)
             self._wait()
 
-        # cancel_event was set
-        return "failed"
+        return "failed"  # unreachable, loop exits via return or exception
 
     def _run_with_retries(self, stage: Stage, prompt: str,
                           known: set[str]) -> ExecutorResult:
@@ -251,7 +247,6 @@ class PipelineEngine:
                     prompt, model=runner.model, known_signals=known,
                     on_output=self._on_output,
                     on_signal=self._on_signal,
-                    cancel=self.cancel,
                 )
                 if result.exit_code == 0:
                     return result
@@ -339,4 +334,4 @@ class PipelineEngine:
         return True
 
     def _wait(self) -> None:
-        self.cancel.wait(timeout=self.delay)
+        time.sleep(self.delay)
