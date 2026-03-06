@@ -21,8 +21,8 @@ theming system — NOT a parallel design system.
   Screenshots, mockups, or Dribbble shots showing desired visual direction.
   If the directory exists, open every image. These override competitor
   patterns — they represent what the user WANTS it to look like.
-- **Gluestack skills**: read the installed `gluestack-ui-v4:styling` skill
-  to understand the token system you're configuring
+- **Gluestack skills**: the `gluestack-ui-v4:styling` skill is available as
+  project instructions. Use it to understand the token system you're configuring
 
 ## Output
 
@@ -36,10 +36,11 @@ Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_THEME}}`
    visual references — they take priority over competitor patterns for
    style decisions (colors, density, tone). Competitors still inform
    what's standard for the category.
-3. **Read the gluestack agent-skills**, specifically `gluestack-ui-v4:styling`.
+3. Review the `gluestack-ui-v4:styling` skill (loaded as project instructions).
    Understand the semantic token names and CSS variable system.
    Your output configures THIS system — you're choosing values for
    gluestack's existing token slots, not inventing new ones.
+   Only use tokens documented in the skill — do not invent custom tokens.
 4. Read `apps.json` for app metadata.
 5. Open 2-3 representative screenshots from EACH competitor app
    (home screen, main feature screen, onboarding if available). Study:
@@ -86,6 +87,8 @@ direction:
 # These values populate gluestack's semantic token slots.
 # Use the EXACT token names from gluestack's styling system.
 # The implement agent copies these into the gluestack provider config.
+# Only use semantic tokens documented in the gluestack-ui-v4:styling skill.
+# Do NOT invent custom tokens (no success, warning, overlay, etc.).
 tokens:
   light:
     "--color-background": "#FFFFFF"
@@ -100,14 +103,13 @@ tokens:
     "--color-accent-foreground": "#FFFFFF"
     "--color-card": "#FFFFFF"
     "--color-card-foreground": "#1A1A2E"
+    "--color-popover": "#FFFFFF"
+    "--color-popover-foreground": "#1A1A2E"
     "--color-border": "#E5E7EB"
     "--color-input": "#E5E7EB"
     "--color-ring": "#4A90D9"
     "--color-destructive": "#EF4444"
     "--color-destructive-foreground": "#FFFFFF"
-    "--color-success": "#34D399"
-    "--color-warning": "#FBBF24"
-    "--color-overlay": "rgba(0,0,0,0.4)"
 
   dark:
     "--color-background": "#0F172A"
@@ -122,33 +124,15 @@ tokens:
     "--color-accent-foreground": "#0F172A"
     "--color-card": "#1E293B"
     "--color-card-foreground": "#F1F5F9"
+    "--color-popover": "#1E293B"
+    "--color-popover-foreground": "#F1F5F9"
     "--color-border": "#334155"
     "--color-input": "#334155"
     "--color-ring": "#60A5FA"
     "--color-destructive": "#EF4444"
     "--color-destructive-foreground": "#F1F5F9"
-    "--color-success": "#34D399"
-    "--color-warning": "#FBBF24"
-    "--color-overlay": "rgba(0,0,0,0.6)"
 
   supports_dark_mode: true
-
-# --- Layout tokens ---
-layout:
-  screen_padding: 20
-  section_spacing: 24
-  radius:
-    sm: 8
-    md: 12
-    lg: 16
-    full: 9999
-  default_radius: md
-
-# --- Typography ---
-typography:
-  font_family: system                  # system | specific font name
-  # Size scale used in Heading size prop and Text size prop
-  # These inform component usage, not override gluestack internals
 ```
 
 ## Deriving the Theme
@@ -160,7 +144,7 @@ typography:
 | Competitor screenshots | Actual color palettes, spacing, radius patterns |
 | Screen count + complexity | Density — more screens = can be airier per screen |
 | Dark mode in competitors | Whether to support dark mode |
-| Gluestack token names | MUST use gluestack's actual CSS variable names |
+| Gluestack token names | ONLY use tokens from the gluestack-ui-v4:styling skill |
 
 ## Rules
 
@@ -173,4 +157,3 @@ typography:
 | Direction is for humans | The `direction` section is read by planning agents. Keep it descriptive |
 | Tokens are for code | The `tokens` section is copied into gluestack config. Keep it exact |
 | Conservative | When in doubt, follow the majority of competitors |
-```

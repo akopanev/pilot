@@ -7,6 +7,16 @@ set -euo pipefail
 APPTWEAK_DIR="$PILOT_CONFIG_DIR/.apptweak"
 OUTPUT_DIR="$PILOT_CONFIG_DIR/$PILOT_APPTWEAK_OUTPUT_DIR"
 
+if [ -z "${PILOT_KEYWORDS:-}" ]; then
+  echo "<signal:failed>PILOT_KEYWORDS is not set. Set it in pipeline.yaml vars or pass it when running the pipeline.</signal:failed>"
+  exit 1
+fi
+
+if [ -z "${APPTWEAK_API_KEY:-}" ]; then
+  echo "<signal:failed>APPTWEAK_API_KEY is not set. Add it to .env in the pipeline config directory or export it as an environment variable.</signal:failed>"
+  exit 1
+fi
+
 if [ -f "$OUTPUT_DIR/apps.json" ]; then
   APP_COUNT=$(python3 -c "import json; print(len(json.load(open('$OUTPUT_DIR/apps.json'))))" 2>/dev/null || echo "?")
   echo "<signal:ready>$APP_COUNT competitors (cached)</signal:ready>"

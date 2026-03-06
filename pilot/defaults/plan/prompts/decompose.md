@@ -11,7 +11,8 @@ parallel agents to create each ticket. Wire dependencies after.
 ## Inputs
 
 - **PRD**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD}}`
-- **Screen specs**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS}}`
+- **Screen index**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS}}`
+- **Screen details**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS_DIR}}/`
 - **Theme**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_THEME}}`
 - **Supporting docs**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_DOCS_DIR}}/`
 - **Current epic ID**: `{{var:PILOT_CURRENT_EPIC}}`
@@ -27,8 +28,10 @@ parallel agents to create each ticket. Wire dependencies after.
 ### Step 1: Read everything
 
 1. Read the PRD.
-2. Read screens.yaml — find screens belonging to this epic. These define
-   exactly what UI to build: layout, blocks, components, states.
+2. Read screens.yaml (index) — find screen IDs belonging to this epic.
+   Then read each screen's detail file from
+   `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS_DIR}}/{screen_id}.yaml`.
+   These define exactly what UI to build: layout, blocks, states.
 3. Read theme.yaml — colors, spacing, typography for implementation.
 4. List `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_DOCS_DIR}}/` and read EVERY file.
 5. Run `tk list` to see existing epics and tasks from previous rounds.
@@ -61,7 +64,7 @@ each task, define:
     endpoints, schemas. Reference concrete paths from the docs and
     existing codebase where applicable.
   - **Screen spec** (for UI tasks) — copy the relevant screen's blocks,
-    components, and states from screens.yaml. Include theme tokens the
+    and states from the screen detail file. Include theme tokens the
     screen uses. The implement agent builds exactly what's specified here.
   - **How it fits** — which other tasks/epics this connects to, what
     data flows in and out, what existing patterns to follow (from docs).

@@ -1,6 +1,6 @@
-# Design pipeline — PRD → screens → theme → enriched screens + component mapping
+# Design pipeline — PRD → screens → theme → enriched screens
 # Runs after PRD pipeline, before plan pipeline.
-# Pre-pipeline installs gluestack agent-skills for component knowledge.
+# Pre-pipeline installs gluestack agent-skills + gluestack-ui.
 version: "0.1"
 starting: screens
 
@@ -8,12 +8,38 @@ vars:
   PILOT_PRD: "../prd/data/prd.md"
   PILOT_APPTWEAK_OUTPUT_DIR: "../prd/data/competitors"
   PILOT_SCREENS: "data/screens.yaml"
+  PILOT_SCREENS_DIR: "data/screens"                      # Per-screen detail files ({screen_id}.yaml)
   PILOT_THEME: "data/theme.yaml"
-  PILOT_COMPONENT_CATALOG: "../../docs/components.md"   # Project component catalog (optional)
   PILOT_DESIGN_REFS: "../../design-refs"                # Reference designs — screenshots, mockups (optional)
 
 pre_pipeline: |
-  {{file:scripts/pre_pipeline.sh}}
+  set -euo pipefail
+
+  PROJECT_DIR="$PILOT_CONFIG_DIR/../../"
+  MOBILE_DIR="$PROJECT_DIR/mobile"
+
+  if [ ! -d "$PROJECT_DIR" ]; then
+    echo "Project root not found: $PROJECT_DIR"
+    exit 1
+  fi
+
+  if ! command -v npx &>/dev/null; then
+    echo "npx not found — install Node.js first"
+    exit 1
+  fi
+
+  # --- 1. Agent skills (AI-readable component docs, project root) ---
+  cd "$PROJECT_DIR"
+  if [ -d ".agents/skills/gluestack-ui-v4" ]; then
+    echo "gluestack agent-skills already installed"
+  else
+    echo "Installing gluestack agent-skills..."
+    npx skills add gluestack/agent-skills --skill gluestack-ui-v4 -y 2>&1 || {
+      echo "Warning: failed to install agent-skills, continuing without them"
+    }
+  fi
+
+  echo "Pre-pipeline OK"
 
 stages:
   screens:

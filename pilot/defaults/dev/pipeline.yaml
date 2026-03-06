@@ -6,6 +6,38 @@ starting: pick
 vars:
   PILOT_DEFAULT_BRANCH: master
   PILOT_EPIC: ""                         # Epic ticket ID to work on (e.g., "tk-a1b2"). Tasks outside this epic are ignored.
+  PILOT_MOBILE_DIR: "mobile"             # Mobile app subfolder inside project root
+
+pre_pipeline: |
+  set -euo pipefail
+
+  MOBILE_DIR="$PILOT_CONFIG_DIR/../../$PILOT_MOBILE_DIR"
+
+  if ! command -v npx &>/dev/null; then
+    echo "npx not found — install Node.js first"
+    exit 1
+  fi
+
+  # Install gluestack-ui in mobile app if not already set up
+  if [ ! -d "$MOBILE_DIR" ]; then
+    echo "Warning: $PILOT_MOBILE_DIR/ not found, skipping gluestack-ui init"
+  elif [ -d "$MOBILE_DIR/components/ui/gluestack-ui-provider" ]; then
+    echo "gluestack-ui already initialized in $PILOT_MOBILE_DIR/"
+  elif [ ! -f "$MOBILE_DIR/package.json" ]; then
+    echo "Warning: no package.json in $PILOT_MOBILE_DIR/, skipping gluestack-ui init"
+  else
+    cd "$MOBILE_DIR"
+    echo "Initializing gluestack-ui in $PILOT_MOBILE_DIR/..."
+    npx gluestack-ui@alpha init -y 2>&1 || {
+      echo "Warning: gluestack-ui init failed, continuing without it"
+    }
+    echo "Adding all gluestack-ui components..."
+    npx gluestack-ui@alpha add --all -y 2>&1 || {
+      echo "Warning: gluestack-ui add --all failed"
+    }
+  fi
+
+  echo "Pre-pipeline OK"
 
 stages:
   # Pick next task from tracker, create feature branch

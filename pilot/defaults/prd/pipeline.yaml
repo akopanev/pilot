@@ -2,8 +2,12 @@
 version: "0.1"
 starting: gather
 
+# Environment variables:
+#   APPTWEAK_API_KEY — required. Set in .env or export before running.
+#                      Get yours at https://www.apptweak.com
+
 vars:
-  PILOT_KEYWORDS: ""                       # Comma-separated: "habit tracker,daily habits,routine"
+  PILOT_KEYWORDS: ""                       # REQUIRED. Comma-separated: "habit tracker,daily habits,routine"
   PILOT_NUM_TOP_APPS: "5"
   PILOT_APPTWEAK_OUTPUT_DIR: "data/competitors"
   PILOT_REVIEW_COUNTRY: "us"               # Country code for App Store reviews

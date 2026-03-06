@@ -1,12 +1,12 @@
 # Protocol: Screen Detail
 
-Enrich each screen with content blocks, states, and interactions. Describe
-WHAT appears on each screen — the implement agent (with gluestack skills)
-decides HOW to build it.
+Enrich each screen with content blocks, states, and interactions. Write
+one file per screen. Describe WHAT appears — the implement agent (with
+gluestack skills) decides HOW to build it.
 
 ## Signals
 - `<signal:update>message</signal:update>` — progress
-- `<signal:completed>summary</signal:completed>` — screens.yaml enriched
+- `<signal:completed>summary</signal:completed>` — all screen details written
 - `<signal:failed>reason</signal:failed>` — fatal only
 
 ## Inputs
@@ -21,76 +21,75 @@ decides HOW to build it.
 
 ## Output
 
-Enrich and overwrite: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS}}`
+Write one file per screen to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS_DIR}}/{screen_id}.yaml`
+
+Create the directory if it doesn't exist.
 
 ## Execution
 
-1. Read the existing screens.yaml (screen inventory from previous stage).
+1. Read the existing screens.yaml (screen index from previous stage).
 2. Read theme.yaml — the `direction` section tells you density, contrast,
    emotional tone. This influences how much content fits per screen.
 3. Read the PRD — feature details, user stories, scope for each screen.
 4. Try to read `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_DESIGN_REFS}}/`. If it
    exists, open every image — these show the user's desired look and feel.
    Use them to inform content density and layout choices.
-5. For screens that need visual reference, open 1-2 competitor screenshots
+5. Create the output directory:
+   `mkdir -p {{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS_DIR}}`
+6. `<signal:update>enriching N screens</signal:update>`
+7. For each screen in screens.yaml, write a detail file (see format below).
+   For screens that need visual reference, open 1-2 competitor screenshots
    showing a similar screen type.
-6. `<signal:update>enriching N screens with detail</signal:update>`
-7. For each screen, add the enrichment fields (see format below).
-8. Write the enriched screens.yaml back to the same path.
-9. `<signal:completed>N screens enriched</signal:completed>`
+8. `<signal:completed>N screen details written</signal:completed>`
 
-## Enrichment Fields
+## Per-Screen File Format
 
-For each screen, add these fields alongside the existing ones:
+Each file: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS_DIR}}/{screen_id}.yaml`
 
 ```yaml
-  - id: home_dashboard
-    # ... existing fields (epic, purpose, description, entry, transitions) ...
+id: home_dashboard
+epic: daily_tracking
 
-    # --- Layout ---
-    layout: scrollable_sections         # see layout patterns below
-    scroll: vertical                    # vertical | horizontal | none | paged
+layout: scrollable_sections         # see layout patterns below
+scroll: vertical                    # vertical | horizontal | none | paged
 
-    # --- Content blocks ---
-    # Ordered top-to-bottom. Describe WHAT the user sees, not which
-    # component renders it. The implement agent handles that.
-    blocks:
-      - id: greeting
-        type: header
-        content: "Good morning, {name} — here's your progress today"
+# Content blocks — ordered top-to-bottom as they appear on screen.
+# Describe WHAT the user sees, not which component renders it.
+blocks:
+  - id: greeting
+    type: header
+    content: "Good morning, {name} — here's your progress today"
 
-      - id: daily_progress
-        type: progress_ring
-        content:
-          metric: water_intake
-          goal: daily_goal
-          unit: ml
-          shows: percentage, current/goal text
+  - id: daily_progress
+    type: progress_ring
+    content:
+      metric: water_intake
+      goal: daily_goal
+      unit: ml
+      shows: percentage, current/goal text
 
-      - id: quick_add
-        type: action_row
-        content:
-          actions: ["250ml", "500ml", "Custom"]
-          behavior: tap adds amount instantly (except Custom → opens input)
+  - id: quick_add
+    type: action_row
+    content:
+      actions: ["250ml", "500ml", "Custom"]
+      behavior: tap adds amount instantly (except Custom → opens input)
 
-      - id: today_log
-        type: list
-        content:
-          items: today's water entries, newest first
-          per_item: time, amount, icon
-          empty: "No entries yet. Tap + to start tracking."
+  - id: today_log
+    type: list
+    content:
+      items: today's water entries, newest first
+      per_item: time, amount, icon
+      empty: "No entries yet. Tap + to start tracking."
 
-    # --- States ---
-    states:
-      loading: skeleton placeholders for progress + log
-      empty: first-time user, no entries, show empty prompt
-      error: data load failed, show retry
+states:
+  loading: skeleton placeholders for progress + log
+  empty: first-time user, no entries, show empty prompt
+  error: data load failed, show retry
 
-    # --- Interactions ---
-    interactions:
-      - pull to refresh
-      - tap entry → entry detail screen
-      - long press entry → edit / delete
+interactions:
+  - pull to refresh
+  - tap entry → entry detail screen
+  - long press entry → edit / delete
 ```
 
 ## Layout Patterns
@@ -111,11 +110,12 @@ For each screen, add these fields alongside the existing ones:
 
 | Rule | Constraint |
 |:-----|:-----------|
+| One file per screen | `{screen_id}.yaml` in the screens directory |
 | Describe, don't implement | Say WHAT appears, not which component renders it |
 | States are mandatory | Every screen: default + loading at minimum. Add empty/error where data is fetched |
 | Content is concrete | Use actual copy, field names, units — not "some text here" |
 | Order = visual order | Blocks listed top-to-bottom as they appear on screen |
 | Theme-aware | Respect the theme's density when deciding how much fits per screen |
 | Competitor-informed | Open screenshots when unsure about layout or content patterns |
-| Don't redesign | Enrich existing screens. Don't add, remove, or rename screens |
-| Keep it lean | Short descriptions. The implement agent reads these for every screen — verbosity costs tokens |
+| Don't redesign | Detail existing screens. Don't add, remove, or rename screens |
+| Keep it lean | Short descriptions. The implement agent reads these — verbosity costs tokens |

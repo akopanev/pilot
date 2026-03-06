@@ -12,23 +12,29 @@ content with relevant context from the docs, then create a self-contained
 ## Inputs
 
 - **PRD**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD}}`
-- **Screen specs**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS}}`
+- **Screen index**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS}}`
+  (navigation structure, screen IDs, epic ownership, transitions)
+- **Screen details**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS_DIR}}/`
+  (per-screen files: `{screen_id}.yaml` with layout, blocks, states, interactions)
 - **Theme**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_THEME}}`
 - **Supporting docs**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_DOCS_DIR}}/`
 
 ## Execution
 
 1. Read the PRD.
-2. Read the screen specs (screens.yaml). Each screen has an `epic` field —
+2. Read the screen index (screens.yaml). Each screen has an `epic` field —
    this tells you which screens belong to which epic.
-3. Read the theme (theme.yaml). Cross-cutting context for all epics.
-4. List `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_DOCS_DIR}}/` and read EVERY file.
+3. For each epic, read the per-screen detail files from
+   `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_SCREENS_DIR}}/` — only the files
+   for screens belonging to that epic (matched by the `epic` field in the index).
+4. Read the theme (theme.yaml). Cross-cutting context for all epics.
+5. List `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_DOCS_DIR}}/` and read EVERY file.
    These docs contain architecture decisions, design specs, API contracts,
    tech stack details — context that the PRD alone doesn't have.
-4. Extract all epics (headings matching `## Epic N: ...`).
-5. Renumber with zero-padded 3-digit IDs: Epic 1 → Epic 001, Epic 2 → Epic 002, etc.
-6. `<signal:update>creating N epic tickets</signal:update>`
-7. For each epic, create a ticket:
+6. Extract all epics (headings matching `## Epic N: ...`).
+7. Renumber with zero-padded 3-digit IDs: Epic 1 → Epic 001, Epic 2 → Epic 002, etc.
+8. `<signal:update>creating N epic tickets</signal:update>`
+9. For each epic, create a ticket:
 
 ```bash
 tk create "Epic 001: [Name from PRD]" \
@@ -46,10 +52,9 @@ It must have everything that agent needs:
 - **Context** — relevant cross-cutting info from the PRD (core use cases,
   target user, navigation structure) and from the docs (architecture
   decisions, tech stack, API contracts) that affect this epic
-- **Screens** — the full screen specs from screens.yaml that belong to
-  this epic (matched by the `epic` field). Include layout, blocks,
-  components, states — everything the decomposer needs to create
-  screen-level tasks
+- **Screens** — the per-screen detail files for screens belonging to
+  this epic. Include layout, blocks, states, interactions — everything
+  the decomposer needs to create screen-level tasks
 - **Theme excerpt** — relevant theme tokens (colors, spacing, component
   defaults) that affect this epic's screens
 - **Feature list** — every feature with its What, Scope, and User stories
@@ -63,7 +68,7 @@ product requirements with the technical context from the docs. The
 decomposer needs to understand BOTH what to build and how it fits into
 the overall architecture.
 
-8. **Wire epic-level build dependencies.** The PRD orders epics in build
+10. **Wire epic-level build dependencies.** The PRD orders epics in build
    order: feature epics first, onboarding second-to-last, paywall last.
    Wire dependencies to match this natural order:
 
@@ -80,7 +85,7 @@ the overall architecture.
    tk dep [paywall-id] [onboarding-id]         # paywall shows after onboarding
    ```
 
-9. `<signal:completed>N epics created, deps wired</signal:completed>`
+11. `<signal:completed>N epics created, deps wired</signal:completed>`
 
 ## Rules
 

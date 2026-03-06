@@ -6,7 +6,8 @@ starting: create_epics
 
 vars:
   PILOT_PRD: "../prd/data/prd.md"              # Input: PRD from the prd pipeline
-  PILOT_SCREENS: "../design/data/screens.yaml" # Input: screen specs from design pipeline
+  PILOT_SCREENS: "../design/data/screens.yaml"  # Input: screen index from design pipeline
+  PILOT_SCREENS_DIR: "../design/data/screens"  # Input: per-screen detail files
   PILOT_THEME: "../design/data/theme.yaml"     # Input: visual theme from design pipeline
   PILOT_DOCS_DIR: "../../docs"                # Supporting docs (architecture, design, API specs, etc.)
 
