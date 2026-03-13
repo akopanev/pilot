@@ -1,5 +1,21 @@
 # Protocol: Feature Extraction
 
+## Output Principles
+
+Each `features.md` file will be consumed by an AI agent in the baseline stage,
+not a human reviewer. Write for an agent with zero prior context about this app.
+
+- **Maximum detail.** Describe every feature you observe in the screenshots,
+  no matter how small. Include interaction patterns, visual states, data
+  displayed, and UI elements. Never skip a feature because it seems minor.
+- **Structured and navigable.** Use consistent formatting so the downstream
+  agent can reliably parse and merge features across multiple apps.
+- **No implicit knowledge.** If you see a toggle, describe what it controls.
+  If you see a chart, describe what data it shows and what axes/labels exist.
+  Name every visible element explicitly.
+- **Exhaust the screenshots.** Every screenshot must be fully described.
+  If a screenshot shows 10 features, list all 10. Do not pick "top" features.
+
 Extract features from competitor app screenshots. One agent per app, all in parallel.
 
 ## Signals
@@ -64,7 +80,9 @@ Reviews: {app_folder}/reviews.json
 
 Ordered by importance. Core value proposition first, then supporting features.
 
-- **Feature name** — what it does, how the user interacts with it
+- **Feature name** — what it does, how the user interacts with it, what data
+  is shown, what states exist (empty, populated, error). Include every detail
+  visible in the screenshots. 2-3 sentences minimum per feature.
 - **Feature name** — ...
 - ...
 
@@ -97,5 +115,5 @@ Top 3-5 praises and top 3-5 complaints. Use actual user language.
 | All parallel | Launch ALL agents in one message |
 | Facts only | What the app does. No opinions, no strengths/weaknesses |
 | Prioritize | Order features by importance, not by screenshot order |
-| Concise | One line per feature. Name + what it does. No source citations needed |
+| Thorough | 2-3 sentences per feature minimum. Name + what it does + interaction details + visible states. No source citations needed |
 | Write to file | Each agent writes `features.md` in the app's folder |

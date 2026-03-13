@@ -1,5 +1,22 @@
 # Protocol: Feature Baseline
 
+## Output Principles
+
+This baseline document will be consumed by an AI agent writing the PRD,
+not a human PM. Write for an agent that has zero context about the category.
+
+- **Maximum detail.** Every feature entry must include enough detail for an
+  AI agent to write user stories, scope definitions, and screen designs
+  without seeing the original apps. 3-5 sentences per feature minimum.
+- **No lossy merging.** When deduplicating features across apps, preserve
+  all variant details. If three apps implement "reminders" differently,
+  describe all three approaches in the merged entry.
+- **Structured and navigable.** Consistent formatting, clear categories,
+  explicit tagging. The downstream agent will parse this programmatically.
+- **No implicit knowledge.** Define category-specific terms. Explain why
+  a feature is core vs. nice-to-have — show the reasoning chain from
+  user sentiment to the tag.
+
 Merge per-app feature extractions into a unified feature baseline for a PM writing a PRD.
 
 ## Signals
@@ -62,7 +79,7 @@ Ordered by prevalence within this group.
 
 ### [Category]
 
-- **Feature name** `→ use case N` — what it does, how the user interacts with it. 2-3 sentences with enough detail for a PM to understand scope and expected behavior.
+- **Feature name** `→ use case N` — what it does, how the user interacts with it, what data it displays, what states exist (empty, populated, error), common implementation patterns observed across competitors, and any notable UX variations. 3-5 sentences with enough detail for an AI agent to write complete user stories and scope definitions.
 
 - **Feature name** `→ use case N` — ...
 
@@ -109,5 +126,5 @@ Use actual user language where possible. No app names.
 | Use cases from sentiment | Core use cases come from what users say, not from feature prevalence |
 | Tag honestly | A feature in every app is still nice-to-have if no user cares about it |
 | Describe, don't prescribe | Describe what the feature does. Don't recommend whether to build it |
-| Enough detail | A PM reading this should understand the feature's scope without seeing the apps |
+| Maximum detail | An AI agent reading this must be able to write user stories, scope features, and design screens without seeing the original apps. 3-5 sentences per feature minimum. Include all implementation variants observed across competitors |
 | Order by prevalence | Universal features first, rare/niche features last within each category |

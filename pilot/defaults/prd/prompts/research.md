@@ -1,5 +1,21 @@
 # Protocol: Web Research
 
+## Output Principles
+
+This document will be consumed by an AI agent in the next pipeline stage, not a human.
+Write for an agent that has zero prior context about this market or category.
+
+- **Maximum detail.** Never abbreviate, never summarize to save tokens. Include
+  every finding, every quote, every data point you discover. More detail is
+  always better — downstream agents cannot ask follow-up questions.
+- **Structured and navigable.** Use consistent headings, bullet formatting, and
+  clear section boundaries. Every section must stand alone as a complete reference.
+- **No implicit knowledge.** State everything explicitly. If a term has domain
+  meaning, define it. If a conclusion follows from evidence, show the chain.
+  Nothing is "obvious."
+- **Source everything.** For every claim, note where it came from (subreddit,
+  review, article, forum). The downstream agent needs to assess credibility.
+
 Demand-side research — understand what users WANT, what jobs they're hiring
 apps for, what's broken, what works. Competitor features are evidence of
 demand, not the goal. Organize findings by user need, not by app.
@@ -109,7 +125,7 @@ Emerging patterns. New approaches gaining traction.
 | Rule | Constraint |
 |:-----|:-----------|
 | Demand first | Organize by user need, not by app. Apps are evidence |
-| User voice | Direct quotes are the most valuable data. Collect as many as possible |
+| User voice | Direct quotes are the most valuable data. Collect ALL relevant quotes — do not limit or summarize to save space. Every quote adds context for downstream agents |
 | Competitor features = demand signal | "5/5 apps have X" means the market validated demand for X. Note it as evidence |
 | Source everything | Note where insights came from |
 | Recency matters | Prefer 2025-2026 sources. Ignore anything older than 2 years |

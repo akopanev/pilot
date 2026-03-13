@@ -1,4 +1,4 @@
-# PRD pipeline — gather → reviews → research → analyze → baseline → PRD
+# PRD pipeline — gather → reviews → research → analyze → baseline → PRD → review loop
 version: "0.1"
 starting: gather
 
@@ -17,6 +17,10 @@ vars:
   PILOT_BRIEF: "brief.md"                 # User brief (optional, relative to config dir)
   PILOT_PRD: "data/prd.md"               # Final PRD (output of prd stage)
   PILOT_LANGUAGES: "English, Spanish, German, French, Portuguese, Dutch"
+  PILOT_PRD_ROUND: "1"                  # Current refinement round (managed by refine_critique)
+  PILOT_PRD_REFINE_ROUNDS: "3"          # Max refinement rounds (safety cap)
+  PILOT_REVIEW_CODEX: "data/review_codex.md"     # Codex review output
+  PILOT_REVIEW_GEMINI: "data/review_gemini.md"    # Gemini review output
 
 pre_pipeline: |
   {{file:scripts/pre_pipeline.sh}}
@@ -80,5 +84,40 @@ stages:
       model: opus
     
     on_signal:
-      completed: __succeed__
+      completed: review_codex
+      default: __fail__
+
+  review_codex:
+    pre_step: |
+      echo "PILOT_REVIEW_OUTPUT=data/review_codex.md" >> "$PILOT_CONFIG_DIR/.pilot/vars"
+    prompt: |
+      {{file:prompts/review.md}}
+    runner:
+      executor: codex
+      model: o3
+    on_signal:
+      completed: review_gemini
+      default: __fail__
+
+  review_gemini:
+    pre_step: |
+      echo "PILOT_REVIEW_OUTPUT=data/review_gemini.md" >> "$PILOT_CONFIG_DIR/.pilot/vars"
+    prompt: |
+      {{file:prompts/review.md}}
+    runner:
+      executor: gemini
+      model: gemini-2.5-pro
+    on_signal:
+      completed: refine_critique
+      default: __fail__
+
+  refine_critique:
+    prompt: |
+      {{file:prompts/refine_critique.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      repeat: review_codex
+      converged: __succeed__
       default: __fail__

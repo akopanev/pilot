@@ -3,6 +3,26 @@
 Write a PRD based on the feature baseline, web research, and optionally a user brief.
 Shadow strategy — replicate what top competitors ship. Structure output as plannable epics.
 
+## Output Principles
+
+This PRD will be consumed by AI agents in the design and planning pipelines,
+not a human PM. It is the single source of truth for all downstream automation.
+
+- **Maximum detail in every section.** Every feature must include complete
+  scope, explicit boundaries (what's in vs. what's out), detailed user stories,
+  and concrete interaction descriptions. An AI agent must be able to design
+  screens and write implementation tickets from this document alone.
+- **No implicit knowledge.** Spell out every assumption. If the app needs
+  a settings screen, describe what's on it. If a flow has error states,
+  describe them. If a feature has edge cases, list them.
+- **Structured and machine-parseable.** Use consistent heading levels, table
+  formats, and naming conventions throughout. Screen IDs, epic numbers, and
+  feature IDs must be used consistently so downstream agents can cross-reference.
+- **Complete screen inventory.** Every screen referenced anywhere in the PRD
+  must appear in the Screen Inventory table. No orphan references.
+- **Exhaustive deferred list.** Every feature from the baseline that is NOT
+  in MVP must appear in the Deferred section with a clear rationale.
+
 ## Signals
 - `<signal:update>message</signal:update>` — progress
 - `<signal:completed>summary</signal:completed>` — PRD written
@@ -356,7 +376,7 @@ so the cut decisions are traceable.
 | Brief is truth | If brief exists and conflicts with baseline, brief wins |
 | Cut ruthlessly | When in doubt, defer. A smaller MVP that ships is better than a complete one that doesn't |
 | Shadow, don't innovate | Don't invent new features. Replicate what's proven |
-| Scope each feature | Every MVP feature needs concrete scope. "Add social features" is not scope |
+| Scope each feature | Every MVP feature needs exhaustive scope: included behaviors, excluded behaviors, edge cases, error states, data shown, interaction patterns. An AI agent must be able to design and implement from this description alone |
 | Be decisive | Make the call on every feature. In or out, with rationale |
 | Foundation is Epic 1 | Always. Technical scaffolding, no user-facing features |
 | Onboarding is second-to-last | Always. Non-negotiable. Apply the onboarding principles |
@@ -364,4 +384,4 @@ so the cut decisions are traceable.
 | App only | No watch apps, widgets, extensions, App Clips, or any other separate build target. Always defer |
 | Epics, not flat lists | Every feature belongs to an epic. No orphan features |
 | User stories required | Each feature needs 1-3 user stories for downstream planning |
-| Human reviews | This PRD will be reviewed and edited. Make it easy to move features between epics and deferred |
+| AI-consumable | This PRD is consumed by AI agents for design and planning. Every section must be self-contained, unambiguous, and complete. Make it easy to move features between epics and deferred |
