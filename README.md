@@ -14,7 +14,7 @@ cd your-project && pilot init
 # Run locally
 pilot run .pilot/pipeline.yaml
 
-# Run in Docker (claude-code, codex, opencode pre-installed)
+# Run in Docker (claude-code, codex, gemini, opencode pre-installed)
 pilot-docker run .pilot/pipeline.yaml
 ```
 
@@ -27,11 +27,13 @@ Stages are nodes. Signals are edges. The engine loops:
 **run stage → parse signals → follow edge → next stage**
 
 ```
-       pick ──ready──▶ implement ──▶ review ──approved──▶ merge ──▶ pick
-         │                             │
-     completed                      rejected
-         │                             │
-       (exit)                         fix ──────────────▶ review
+       pick ──ready──▶ implement ──▶ verify ──approved──▶ review ──approved──▶ merge ──▶ pick
+         │                              │                    │
+     completed                       rejected             rejected
+         │                              │                    │
+       (exit)                          fix ◀─────────────────┘
+                                        │
+                                      stuck ──▶ escalate
 ```
 
 No stage is special. Any stage can point to any other stage — loops, branches, convergence are all just config. Agents emit signals; they don't decide routing.
@@ -45,6 +47,15 @@ starting: pick
 vars:
   PILOT_DEFAULT_BRANCH: master
 
+pre_pipeline: |
+  echo "setup steps here"
+
+on_pipeline_success: |
+  echo "cleanup on success"
+
+on_pipeline_failure: |
+  echo "alert on failure"
+
 stages:
   pick:
     runner:
@@ -52,13 +63,15 @@ stages:
       command: "{{file:scripts/pick.sh}}"
     on_signal:
       ready: implement
-      completed: __exit__
+      completed: __succeed__
+      failed: __fail__
       default: pick
 
   implement:
     prompt: "{{file:prompts/implement.md}}"
     runner: { executor: codex, model: o3 }
     fallback_runner: { executor: claude-code, model: sonnet }
+    pre_step: "echo 'starting implementation'"
     on_signal:
       default: review
 
@@ -75,6 +88,8 @@ stages:
 
 Named nodes in the graph. `starting:` sets the entry point (defaults to first stage). On crash, the engine resumes from the persisted stage.
 
+Each stage supports optional `pre_step` and `post_step` — shell commands that run before and after the executor.
+
 ### Runners
 
 | Executor | Description |
@@ -82,7 +97,8 @@ Named nodes in the graph. `starting:` sets the entry point (defaults to first st
 | `shell` | Shell scripts/commands (uses `command:`) |
 | `claude-code` | Claude Code (`--dangerously-skip-permissions`) |
 | `codex` | OpenAI Codex (`--sandbox full-auto`) |
-| `opencode` | OpenCode (`-m provider/model`) |
+| `gemini` | Google Gemini CLI (`--approval-mode yolo`) |
+| `opencode` | OpenCode (`--dangerous`) |
 | anything else | Generic CLI (`<tool> --model M -p PROMPT`) |
 
 Each stage has a `runner` and optional `fallback_runner`. Primary retries twice, then fallback retries twice. Three consecutive round failures stop the pipeline.
@@ -97,24 +113,73 @@ Agents and scripts emit signals as XML tags in their output:
 <signal:rejected>tests failing</signal:rejected>
 ```
 
-The engine matches the first domain signal against `on_signal:` to route. `default` catches rounds with no signal. `__exit__` stops the pipeline.
+The engine matches the first domain signal against `on_signal:` to route. `default` catches rounds with no signal.
+
+**Exit transitions:**
+- `__succeed__` — stop the pipeline (clean exit, state cleared)
+- `__fail__` — stop the pipeline (failure exit, state preserved for resume)
 
 **Built-in signals** (not routed):
 - `update` — real-time progress display
 - `var` — persist a key-value pair: `<signal:var key=NAME>value</signal:var>`
 
+### Pipeline Hooks
+
+Top-level shell commands that run at pipeline lifecycle boundaries:
+
+| Hook | When |
+|------|------|
+| `pre_pipeline` | Before the main loop starts |
+| `on_pipeline_success` | After the main loop completes successfully |
+| `on_pipeline_failure` | On pipeline failure or exception |
+
 ### Templates
 
 Prompts and commands support two template types, resolved fresh each round:
 
-- **`{{file:path}}`** — inline file contents (relative to `.pilot/`, recursive)
+- **`{{file:path}}`** — inline file contents (relative to `.pilot/`, recursive up to depth 10)
 - **`{{var:NAME}}`** — inline a var from `.pilot/vars`
 
 ### Vars
 
 Key-value pairs persisted in `.pilot/vars`. Available as `{{var:NAME}}` in templates and as `$NAME` env vars in shell stages.
 
-Set from three places: `vars:` in config, `<signal:var>` from agents, or direct file edit. Cleaned on pipeline exit.
+Set from three places: `vars:` in config, `<signal:var>` from agents, or direct file edit. Cleaned on successful pipeline exit; preserved on failure.
+
+## Default Pipelines
+
+`pilot init` scaffolds four pipelines into `.pilot/`:
+
+| Pipeline | Path | Description |
+|----------|------|-------------|
+| **dev** | `dev/pipeline.yaml` | Pick task → implement → verify → review → fix → merge loop |
+| **prd** | `prd/pipeline.yaml` | Gather competitor data → research → analyze → baseline → generate PRD |
+| **design** | `design/pipeline.yaml` | Screens → theme → per-screen detail |
+| **plan** | `plan/pipeline.yaml` | Create epics → pick epic → decompose into tasks (loop) |
+
+### Dev Pipeline
+
+The default development workflow. Picks tasks from a tracker, implements them with AI, runs automated verification (typecheck, lint, tests), sends to AI code review, and squash-merges on approval. Includes an escalation stage for stuck review/fix loops.
+
+```
+pick → implement → verify → review → merge → pick
+                     ↓         ↓
+                    fix ←──────┘
+                     ↓
+                  escalate
+```
+
+### PRD Pipeline
+
+Competitive research and PRD generation. Gathers competitor data via AppTweak API, fetches App Store reviews, runs demand-side research, extracts features per competitor, merges into a baseline, and generates a product requirements document.
+
+### Design Pipeline
+
+Design system generation from a PRD. Creates screen specifications, establishes a visual theme, then generates per-screen detailed designs.
+
+### Plan Pipeline
+
+Task decomposition from a PRD. Creates epic-level tickets, then loops through each epic to decompose it into implementable tasks.
 
 ## Docker
 
@@ -124,7 +189,7 @@ pilot-docker --build run .pilot/pipeline.yaml    # rebuild image
 ANTHROPIC_API_KEY=sk-... pilot-docker run .pilot/pipeline.yaml
 ```
 
-Hermetic container with claude-code, codex, opencode pre-installed. Auto-builds image, mounts workspace, forwards credentials (Keychain, API keys, configs), matches host UID.
+Hermetic container with claude-code, codex, gemini, opencode pre-installed. Auto-builds image, mounts workspace, forwards credentials (Keychain, API keys, configs), matches host UID.
 
 ## Customization
 
@@ -145,13 +210,14 @@ pilot run <pipeline.yaml>              Run the pipeline
 pilot run <pipeline.yaml> --dry-run    Show stages without executing
 pilot run <pipeline.yaml> --verbose    Stream executor output to terminal
 pilot validate <pipeline.yaml>         Validate config
-pilot init                             Scaffold .pilot/ with default dev pipeline
+pilot init                             Scaffold .pilot/ with default pipelines
+pilot graph <pipeline.yaml>            Generate PNG visualization of the pipeline
 ```
 
 ## Persistence
 
 | File | Purpose | Crash-safe | Cleaned on exit |
 |------|---------|------------|-----------------|
-| `.pilot/state` | Current stage | Yes | Yes |
-| `.pilot/vars` | Key-value pairs | Yes | Yes |
-| `.pilot/logs/` | Session logs (timestamped) | — | No |
+| `.pilot/state` | Current stage | Yes | On success only |
+| `.pilot/vars` | Key-value pairs | Yes | On success only |
+| `.pilot/logs/` | Session logs (timestamped, per-round) | — | No |
