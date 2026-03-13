@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pilot.executors.claude import ClaudeExecutor
 from pilot.executors.codex import CodexExecutor
+from pilot.executors.gemini import GeminiExecutor
 from pilot.executors.generic import GenericExecutor
 from pilot.executors.opencode import OpenCodeExecutor
 from pilot.executors.result import ExecutorResult
@@ -17,6 +18,7 @@ class ExecutorPool:
       - "shell"       -> ShellExecutor    (runs commands, prompt = command)
       - "claude-code" -> ClaudeExecutor   (JSON stream)
       - "codex"       -> CodexExecutor    (split stderr/stdout)
+      - "gemini"      -> GeminiExecutor   (JSON stream, yolo mode)
       - "opencode"    -> OpenCodeExecutor (opencode.ai, dangerous mode)
       - anything else -> GenericExecutor  (plain text)
     """
@@ -37,6 +39,8 @@ class ExecutorPool:
             return ClaudeExecutor()
         if name == "codex":
             return CodexExecutor()
+        if name == "gemini":
+            return GeminiExecutor()
         if name == "opencode":
             return OpenCodeExecutor()
         return GenericExecutor(tool=name)
