@@ -23,13 +23,14 @@ class CodexExecutor:
             on_signal: callable = None,
             cancel=None) -> ExecutorResult:
         effective_model = model or "o3"
-        sandbox = "full-auto"
-        if os.environ.get("PILOT_DOCKER") == "1":
-            sandbox = "danger-full-access"
+        use_docker = os.environ.get("PILOT_DOCKER") == "1"
 
-        cmd = [
-            "codex", "exec",
-            "--sandbox", sandbox,
+        cmd = ["codex", "exec"]
+        if use_docker:
+            cmd.append("--dangerously-bypass-approvals-and-sandbox")
+        else:
+            cmd.append("--full-auto")
+        cmd += [
             "--skip-git-repo-check",
             "-c", f'model="{effective_model}"',
             "-c", "model_reasoning_effort=xhigh",

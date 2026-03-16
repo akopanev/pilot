@@ -328,6 +328,7 @@ class PipelineEngine:
         proc = subprocess.run(
             command,
             shell=True,
+            executable="bash",
             cwd=self.config_dir,
             capture_output=True,
             text=True,
