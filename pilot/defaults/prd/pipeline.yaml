@@ -100,7 +100,7 @@ stages:
       {{file:prompts/review.md}}
     runner:
       executor: codex
-      model: o3
+      model: gpt-5.4
     on_signal:
       completed: review_gemini
       default: __fail__
@@ -112,7 +112,7 @@ stages:
       {{file:prompts/review.md}}
     runner:
       executor: gemini
-      model: gemini-2.5-pro
+      model: gemini-3-pro-preview
     on_signal:
       completed: refine_critique
       default: __fail__
