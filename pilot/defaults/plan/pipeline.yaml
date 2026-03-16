@@ -4,6 +4,9 @@
 version: "0.1"
 starting: create_epics
 
+on_pipeline_success: bash ../scripts/notify.sh
+on_pipeline_failure: bash ../scripts/notify.sh
+
 vars:
   PILOT_PRD: "../prd/data/prd.md"              # Input: PRD from the prd pipeline
   PILOT_SCREENS: "../design/data/screens.yaml"  # Input: screen index from design pipeline

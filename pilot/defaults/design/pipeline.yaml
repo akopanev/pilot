@@ -4,6 +4,9 @@
 version: "0.1"
 starting: screens
 
+on_pipeline_success: bash ../scripts/notify.sh
+on_pipeline_failure: bash ../scripts/notify.sh
+
 vars:
   PILOT_PRD: "../prd/data/prd.md"
   PILOT_APPTWEAK_OUTPUT_DIR: "../prd/data/competitors"

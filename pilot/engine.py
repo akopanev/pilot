@@ -89,6 +89,7 @@ class PipelineEngine:
         # Export config dir so scripts and prompts can reference it
         abs_config_dir = os.path.abspath(self.config_dir)
         os.environ["PILOT_CONFIG_DIR"] = abs_config_dir
+        os.environ["PILOT_PIPELINE_NAME"] = os.path.basename(abs_config_dir)
         write_var(self.vars_path, "PILOT_CONFIG_DIR", abs_config_dir)
 
         # Load .env (secrets) before anything
@@ -99,11 +100,20 @@ class PipelineEngine:
             if not self._run_step("pre_pipeline", self.config.pre_pipeline, show_output=True):
                 raise PipelineError("pre_pipeline failed")
 
+        self._pipeline_rounds = 0
+        self._pipeline_last_stage = self.state.stage
+        pipeline_start = time.monotonic()
+
         exit_status = "failed"
         try:
             exit_status = self._main_loop()
         finally:
+            # Expose pipeline metadata as env vars for hooks
+            total = int(time.monotonic() - pipeline_start)
             os.environ["PILOT_EXIT_STATUS"] = exit_status
+            os.environ["PILOT_DURATION"] = self._fmt_duration(total)
+            os.environ["PILOT_ROUNDS"] = str(self._pipeline_rounds)
+            os.environ["PILOT_LAST_STAGE"] = self._pipeline_last_stage
 
             # Clear state before conditional hooks (avoid stale state if chaining)
             if exit_status == "success":
@@ -132,6 +142,8 @@ class PipelineEngine:
             stage = self.config.stages.get(self.state.stage)
             if not stage:
                 raise PipelineError(f"Unknown stage: {self.state.stage}")
+            self._pipeline_rounds = round_num
+            self._pipeline_last_stage = stage.name
 
             self.display.round_header(
                 round_num,

@@ -26,6 +26,8 @@ pre_pipeline: |
   {{file:scripts/pre_pipeline.sh}}
 on_pipeline_success: |
   {{file:scripts/cleanup.sh}}
+  bash ../scripts/notify.sh
+on_pipeline_failure: bash ../scripts/notify.sh
 
 stages:
   gather:

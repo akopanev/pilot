@@ -8,6 +8,9 @@ vars:
   PILOT_EPIC: ""                         # Epic ticket ID to work on (e.g., "tk-a1b2"). Tasks outside this epic are ignored.
   PILOT_MOBILE_DIR: "mobile"             # Mobile app subfolder inside project root
 
+on_pipeline_success: bash ../scripts/notify.sh
+on_pipeline_failure: bash ../scripts/notify.sh
+
 pre_pipeline: |
   set -euo pipefail
 
