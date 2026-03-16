@@ -1,27 +1,23 @@
 # Protocol: PRD Generation
 
-Write a PRD based on the feature baseline, web research, and optionally a user brief.
-Shadow strategy — replicate what top competitors ship. Structure output as plannable epics.
+Write a parity-first PRD based on the baseline, web research, and optionally a user brief.
+Goal: shadow proven competitors as faithfully as possible from the available evidence, while
+filling unavoidable gaps automatically using majority patterns and clearly labeled assumptions.
 
 ## Output Principles
 
-This PRD will be consumed by AI agents in the design and planning pipelines,
-not a human PM. It is the single source of truth for all downstream automation.
+This PRD will be consumed by AI agents in the design and planning pipelines.
 
-- **Maximum detail in every section.** Every feature must include complete
-  scope, explicit boundaries (what's in vs. what's out), detailed user stories,
-  and concrete interaction descriptions. An AI agent must be able to design
-  screens and write implementation tickets from this document alone.
-- **No implicit knowledge.** Spell out every assumption. If the app needs
-  a settings screen, describe what's on it. If a flow has error states,
-  describe them. If a feature has edge cases, list them.
-- **Structured and machine-parseable.** Use consistent heading levels, table
-  formats, and naming conventions throughout. Screen IDs, epic numbers, and
-  feature IDs must be used consistently so downstream agents can cross-reference.
-- **Complete screen inventory.** Every screen referenced anywhere in the PRD
-  must appear in the Screen Inventory table. No orphan references.
-- **Exhaustive deferred list.** Every feature from the baseline that is NOT
-  in MVP must appear in the Deferred section with a clear rationale.
+- **Parity first.** Prefer cloning the dominant competitor pattern over inventing a cleaner
+  or leaner alternative. If evidence is incomplete, infer from the strongest market pattern.
+- **No fake certainty.** The document should distinguish between observed facts, strong
+  inferences, and fallback assumptions, but still make clear build decisions.
+- **Implementation-ready.** Every feature should include scope, supporting flows, edge cases,
+  error/loading/empty states, and interactions detailed enough for downstream agents.
+- **Complete enough to build.** Do not leave obvious production gaps like settings, edit/delete,
+  restore purchases, or permissions undefined if the product shape implies them.
+- **Escalate only material uncertainty.** Ask the human only when ambiguity materially changes
+  scope, architecture, monetization, or the core user journey.
 
 ## Signals
 - `<signal:update>message</signal:update>` — progress
@@ -30,100 +26,77 @@ not a human PM. It is the single source of truth for all downstream automation.
 
 ## Inputs
 
-- **Feature baseline**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}`
+- **Parity baseline**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}`
 - **Web research**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}`
 - **User brief** (optional): `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_BRIEF}}`
 
 ## Output
 
-Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD}}`
+- PRD: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD}}`
+- Human Q&A pack: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD_QA}}`
 
 ## Execution
 
-1. Read the feature baseline.
+1. Read the parity baseline.
 2. Read the web research.
-3. Try to read the user brief. If the file doesn't exist or is empty, proceed
-   without it — derive product context from the baseline and research instead.
-4. `<signal:update>writing PRD</signal:update>`
-5. Write the PRD to `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD}}` in the format below.
-6. `<signal:completed>PRD written</signal:completed>`
+3. Try to read the user brief. If the file doesn't exist or is empty, proceed without it.
+4. `<signal:update>writing parity-first PRD</signal:update>`
+5. Build the PRD using this decision order:
+   - explicit user brief, if present
+   - high-confidence observed market patterns
+   - medium-confidence supported inferences
+   - low-confidence default parity assumptions only when needed to avoid an obviously incomplete product
+6. For every ambiguous area, decide one of:
+   - **include with high confidence**
+   - **include with medium confidence**
+   - **include as default assumption**
+   - **defer**
+   - **escalate to human Q&A** only if the ambiguity materially changes build scope or business behavior
+7. Write the PRD to `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD}}`.
+8. Write a concise human Q&A pack to `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD_QA}}`.
+9. `<signal:completed>PRD + Q&A pack written</signal:completed>`
 
 ---
 
 ## Hard Constraints
 
-These are non-negotiable structural requirements. Every PRD must have them,
-in this order:
-
-1. **Epic 1 is always Foundation.** Project scaffolding, core data models,
-   base navigation shell, localization infrastructure, and any setup that
-   all feature epics depend on. This is a **technical-only** epic — no
-   user-facing screens, no UI features, no settings editors, no forms.
-   Just the skeleton: project init, shared types/models, empty navigation
-   tabs, i18n wiring, auth skeleton. If a user can interact with it
-   beyond navigating between empty tabs, it belongs in a feature epic.
-   Derive its scope from what the feature epics need.
-
-2. **Feature epics come next.** All product features are grouped into
-   epics ordered by impact on the core use cases. Each epic is a plannable
-   unit — a set of related features that ship together. No flat feature
-   lists. Every feature belongs to exactly one epic.
-
-3. **Second-to-last epic is always Onboarding.** The first 30 seconds of
-   the product are the primary driver for retention and word-of-mouth.
-   Design the product from the onboarding experience outward. Onboarding
-   comes after feature epics because you build the product first, then the
-   entrance into it. See [Onboarding Principles](#onboarding-principles).
-
-4. **Last epic is always Monetization Gate (Paywall).** Immediately after
-   onboarding, present a paywall with a prominent skip button. The user has
-   just experienced the aha moment — this is the highest-intent conversion
-   point. The skip button is mandatory: never block users from entering the
-   product. Paywall is last because it wraps onboarding.
-
-5. **App only. No extensions.** The PRD covers the main app and nothing
-   else. Automatically defer any feature that requires a separate build
-   target: Apple Watch apps, widgets, iMessage extensions, Siri intents,
-   Safari extensions, App Clips, or any other extension point. These are
-   out of scope for MVP — no exceptions, even if every competitor has them.
-
-6. **React Native, cross-platform.** The app is built with React Native
-   targeting both iOS and Android from a single codebase. All features must
-   be designed for cross-platform compatibility. No platform-specific APIs
-   unless wrapped with a cross-platform abstraction. Native modules are
-   acceptable only when no React Native equivalent exists.
-
-7. **Localization from day one.** All user-facing strings must be
-   localizable from the start. MVP ships with: {{var:PILOT_LANGUAGES}}.
-   This is a hard requirement — not a v1.1 item. The PRD should note
-   this in the Overview or as a cross-cutting concern so engineers build
-   with localization infrastructure from the first commit.
+1. **Epic 1 is always Foundation.** Technical setup only.
+2. **Feature epics come next.** Group by user outcome, not by layer.
+3. **Second-to-last epic is always Onboarding.**
+4. **Last epic is always Monetization Gate (Paywall).**
+5. **App only. No extensions.** Defer widgets, watch apps, App Clips, etc.
+6. **React Native, cross-platform.**
+7. **Localization from day one.** MVP ships with: {{var:PILOT_LANGUAGES}}.
 
 ---
 
-## Onboarding Principles
+## Gap-Filling Rules
 
-Apply these when writing the Onboarding epic. They are not optional.
+Apply these before creating human questions.
 
-- **Make the first 30 seconds magical.** Invest disproportionately in the
-  first moments. This is the primary driver for word-of-mouth growth.
-- **Action, not explanation.** Users learn by doing. No carousels, no
-  tooltip tours, no "welcome to the app" screens. Get users into the core
-  experience immediately.
-- **Remove every blocker to the aha moment.** Every screen between signup
-  and value is a potential drop-off. Cut steps that don't earn their place.
-  But note: more screens is not the problem — friction is. **10+ onboarding
-  screens is totally fine** as long as each one is fast, purposeful, and
-  moves the user forward. Short, focused screens (one question each, big
-  tap targets) convert better than fewer screens crammed with fields.
-  Focus your detail on the KEY screens — the ones that deliver aha moments
-  or collect inputs critical to personalization.
-- **Design like a game tutorial.** Progressive disclosure — teach by letting
-  the user do, not by telling. Reward early actions.
-- **Request permissions in context.** Never ask for notifications, health,
-  or location on a cold screen. Ask when the user does something that needs it.
-- **Time to value < 30 seconds.** The user must do something meaningful
-  (not just view something) within the first 30 seconds.
+1. **Use majority competitor patterns first.**
+   - If most competitors use a tab bar, use a tab bar.
+   - If a visible list clearly implies detail/edit/delete, include those flows.
+   - If monetization exists, include restore purchases and manage subscription entry.
+   - If reminders are central, include reminder settings and contextual permission prompts.
+
+2. **Assume production-grade states.**
+   - Loading, empty, error, retry, and offline fallback where appropriate.
+   - Success confirmations where user actions need reassurance.
+   - Destructive action confirmation for delete/cancel if standard for the flow.
+
+3. **Assume support surfaces required by visible features.**
+   - Settings for visible personalization
+   - Edit flows for user-created content
+   - Detail views for tappable cards/lists
+   - Account/access management where auth or sync is implied
+
+4. **Only escalate to human Q&A if unresolved ambiguity changes one of:**
+   - business model or paywall behavior
+   - auth requirements
+   - core navigation structure
+   - major data model boundaries
+   - primary onboarding path
 
 ---
 
@@ -133,255 +106,194 @@ Apply these when writing the Onboarding epic. They are not optional.
 # PRD: [Product Name]
 
 ## Overview
-One paragraph. What this app is, who it's for, what it does.
-Derived from the brief if available, otherwise from baseline + research.
+One paragraph. What this app is, who it is for, and what it does.
 
 **Core use cases** (1-3):
-1. [The primary thing users come to this app to do]
-2. [The second thing, if any]
-3. [The third thing, if any]
-
-Every MVP feature must trace back to one of these. If it doesn't, defer it.
+1. [Primary use case]
+2. [Secondary use case]
+3. [Third use case if needed]
 
 ## Strategy
-Shadow — replicate proven features from top competitors. Ship fast,
-validate CAC. Differentiate later if unit economics work.
+Shadow existing winners. Replicate dominant competitor patterns and only
+deviate when the brief explicitly requires it.
 
 ## Target User
-Who this is for. Demographics, behavior, motivation.
-Keep it concrete — one paragraph.
+Concrete paragraph.
+
+## Evidence Posture
+
+- **High-confidence patterns** — what is directly observed or explicit
+- **Medium-confidence patterns** — what is strongly inferred
+- **Default assumptions used** — what was filled in automatically to avoid obvious product gaps
 
 ---
 
 ## Epic 1: Foundation
 
-**Goal**: Technical scaffolding only. No user-facing features.
+**Goal**: Technical scaffolding only. No user-facing product behavior.
 
-- **Project setup**: tooling, directory structure, CI/CD skeleton.
-  pnpm with `node-linker=hoisted` in `.npmrc` (required for React Native
-  + CocoaPods compatibility)
-- **Core data models**: shared types and entities (TypeScript types, DB schema)
-- **Base navigation**: tab bar / router shell with **empty placeholder screens**
-- **Localization infrastructure**: i18n setup, string extraction pipeline,
-  Foundation-only strings (tab labels, common actions)
-- **Auth skeleton**: sign-up / sign-in flow if applicable
-- **Theme setup**: design tokens, provider, light/dark mode
+- Project setup
+- Core data models
+- Base navigation shell with placeholder screens
+- Localization infrastructure
+- Auth skeleton if applicable
+- Theme setup
 
-**NOT in Foundation**: settings UI, profile editors, forms, toggles,
-pickers, save flows, or any screen where a user does something beyond
-seeing a placeholder. Those belong in feature epics.
-
-Keep this minimal — only what's needed for the first feature epic to start.
+**NOT in Foundation**: real product flows, settings editors, profile forms, paywall UI, onboarding UI.
 
 ---
 
 ## Epic 2: [Epic Name]
 
-**Goal**: what user outcome this epic delivers AND why it matters for
-retention or the core use case. Not "add history" — instead "Users
-understand whether they're on track, and the streak mechanic creates
-a daily reason to return."
+**Goal**: the user outcome this epic delivers and why it matters.
 
 ### Features
 
 #### F1: Feature Name
-- **What**: what it does from the user's perspective. 2-3 sentences.
-- **Why MVP**: why this is in v1 (e.g., "all competitors have it",
-  "core to the value proposition", "needed for retention loop")
-- **Scope**: concrete boundaries — included vs. explicitly excluded.
-  Enough detail for an engineer to estimate.
-- **User stories**: 1-3 key user stories in "As a [user], I want [action]
-  so that [outcome]" format.
+- **Evidence level**: high / medium / assumed
+- **Parity rationale**: which competitor patterns or baseline findings support inclusion
+- **What**: user-facing behavior in detail
+- **Scope**: included behavior, excluded behavior, supporting flows, and system behavior
+- **States**: default, loading, empty, error, success, destructive confirmation, offline fallback if relevant
+- **User stories**:
+  - As a [user], I want [action] so that [outcome].
+- **Notes for downstream design/implementation**: concrete interaction and data details
 
 #### F2: Feature Name
 - ...
 
-#### Localization (if epic adds user-facing strings)
-- Update/add localized strings for all features in this epic across all
-  supported languages ({{var:PILOT_LANGUAGES}}).
+#### Localization
+- User-facing strings introduced by this epic across all supported languages
 
 ---
 
-## Epic N: [Epic Name]
-(repeat feature epic structure)
+## Epic N: [Feature Epic Name]
+(repeat)
 
 ---
 
 ## Epic N+1: Onboarding
 
-**Goal**: Get the user to the aha moment in under 30 seconds.
+**Goal**: Get the user to the first meaningful value moment quickly, while matching the strongest competitor pattern available.
 
 ### First-Run Flow
-Step-by-step screens the user sees on first launch. For each step:
-- **Screen**: what the user sees
-- **Action**: what the user does (not reads — does)
-- **Why**: what this step accomplishes toward the aha moment
-
-Design principles: action-first, no carousels, no explanation screens.
-Every step must earn its place — if removing it doesn't hurt, remove it.
+For each step:
+- **Screen**
+- **Evidence level**
+- **What the user sees**
+- **What the user does**
+- **Why this step exists**
+- **What happens on skip/back/dismiss**
 
 ### Data Collection
-What we ask (name, goal, preferences) and WHY each field exists.
-Only collect what the product needs in the first session.
+Fields collected, why they exist, which are required vs skippable, and defaults if skipped.
 
 ### Permissions
-Which system permissions, and the exact moment they're requested.
-Each permission must be triggered by a user action that makes the ask obvious.
+Which permissions are requested, the exact contextual trigger, fallback behavior if denied, and where the user can enable later.
 
 ### Aha Moment
-Define the specific moment the user first experiences core value.
-What they see, what they feel, how quickly it happens.
+Define the first value moment precisely.
 
 ### Activation Hooks
-3-5 moments in the first session that reinforce engagement:
-- **Hook**: what happens
-- **Trigger**: when it fires
-- **Reinforces**: what behavior this builds
+3-5 hooks in the first session.
 
 ---
 
 ## Epic N+2: Monetization Gate
 
-**Goal**: Convert high-intent users immediately after the aha moment.
+**Goal**: Match the likely winning monetization moment and behavior from competitor evidence.
 
-- **Placement**: shown immediately after onboarding completes
-- **What the user sees**: pricing, value props, social proof if available
-- **Skip button**: always visible, prominent, no dark patterns.
-  Label: "Continue for free" or similar — never hide it
-- **What happens on skip**: user enters the full product with free-tier
-  limitations (define what's limited)
-- **What happens on subscribe**: user enters the full product unlocked
+- **Evidence level**
+- **Placement**
+- **What the user sees**
+- **Primary CTA**
+- **Skip / close behavior**
+- **Restore purchases**
+- **Manage subscription access point**
+- **Free-tier behavior after skip**
+- **What unlocks on subscribe**
 
 ---
 
 ## Navigation & Screens
 
-The user journey mapped to named screens. No visual details — just what
-exists, why, and how users move between them.
-
 ### Tabs
-| Tab | Label | Root Screen |
-|:----|:------|:------------|
-| 1 | Home | home_dashboard |
-| 2 | ... | ... |
+| Tab | Label | Root Screen | Confidence |
+|:----|:------|:------------|:-----------|
 
 ### Key Flows
-Main user journeys as screen sequences:
-- **First launch**: onboarding_welcome → ... → paywall → home_dashboard
-- **Core action**: home_dashboard → [screen] → home_dashboard
-- **Settings**: settings → [sub-screen] → settings
+- **First launch**: ...
+- **Primary recurring loop**: ...
+- **Settings/account loop**: ...
+- **Paywall loop**: ...
 
 ### Screen Inventory
 
-| Screen ID | Epic | What the user does here | Comes from | Goes to |
-|:----------|:-----|:------------------------|:-----------|:--------|
-| onboarding_welcome | onboarding | Sees app promise, taps continue | app launch (first time) | onboarding_goal |
-| onboarding_goal | onboarding | Picks their goal | onboarding_welcome | onboarding_prefs |
-| paywall | paywall | Decides to subscribe or skip | onboarding complete | home_dashboard |
-| home_dashboard | [epic] | Sees today's progress, takes core action | paywall, tab bar | log_entry |
-| ... | ... | ... | ... | ... |
+| Screen ID | Epic | What the user does here | Comes from | Goes to | Confidence |
+|:----------|:-----|:------------------------|:-----------|:--------|:-----------|
 
 Rules:
-- One row per screen. Every screen belongs to one epic.
-- Screen IDs are snake_case — they become identifiers downstream.
+- Include confirmed screens, likely supporting screens, and standard utility screens needed for parity.
+- Use medium/low confidence labels when the screen is inferred or assumed.
 - Every user story must map to at least one screen.
-- Include settings, profile, edit screens — not just the happy path.
-- No layout, no visuals, no components. Just the journey.
 
-## Deferred (v1.1+)
+## Deferred
 
-Features from the baseline that are NOT in MVP, with reason.
+Features intentionally not in scope.
 
-- **Feature name** — reason for deferral (e.g., "only 1 of 5 competitors
-  has it", "requires watch app extension", "nice-to-have, not core")
+- **Feature name** — why deferred
 
-## Design Direction
+## Assumptions Register
 
-Before running the design pipeline, prepare a design brief with visual
-references. This section tells the human WHAT to collect.
+Only assumptions actually used in the PRD.
 
-**Mood**: 3-5 adjectives describing the desired feel (e.g., calm, minimal,
-premium, playful, bold). Derived from the app category and target user.
-
-**Reference areas**: List the 2-4 screen types that benefit most from
-visual references. For each, suggest what to look for:
-- e.g., "Dashboard — look for apps with clean progress visualization"
-- e.g., "Onboarding — look for apps with minimal, one-thing-per-screen flows"
-
-**Notes**: Any aesthetic observations from the competitor research —
-common visual patterns, color tendencies in the category, density norms.
-
-_The human places screenshots and notes in `.pilot/design/brief.md`
-before running the design pipeline. This section helps them know what
-to look for._
+- **Assumption**
+  - **Why used**
+  - **Affected sections**
+  - **Risk if wrong**
+  - **Default chosen**
 
 ## Open Questions
-Decisions that need human input before development starts.
+
+Only questions that materially change scope or product behavior.
+Keep this list short.
 ```
 
-## Epic Grouping Rules
+## Human Q&A Pack Format
 
-Group features into epics by user outcome, not by technical similarity.
+Write `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_PRD_QA}}` in this format:
 
-| Guideline | Example |
-|:----------|:--------|
-| One epic = one plannable unit | An epic should be shippable on its own |
-| 2-5 features per epic | Smaller = easier to plan and ship |
-| Name by user outcome | "Daily Tracking", not "Database Features" |
-| Order by priority | Feature epics ordered by impact on retention, then Onboarding (second-to-last), then Paywall (last) |
-| Each feature in exactly one epic | No duplicates across epics |
+```markdown
+# PRD Q&A Pack
 
-## MVP Cut Line
+Only questions worth asking a human before implementation starts.
 
-Before writing features, stop and think:
+## High-Priority Questions
 
-**What are the 1-3 core use cases this product solves?** Write them down.
-Then for every feature, ask: "Does this directly serve one of those core
-use cases?" If no — defer it. Competitor prevalence alone is not enough
-to justify inclusion.
+1. **Question**
+   - **Why it matters**
+   - **Current default in PRD**
+   - **Impact if answered differently**
 
-The goal is the smallest possible app that solves the core use cases well.
-Not the app with the most features. Not parity with competitors. The
-leanest thing that delivers value and lets you validate CAC.
+## Nice-To-Confirm
 
-Think of it as a filter chain — a feature must pass ALL of these:
+- **Question**
+  - **Current default in PRD**
+  - **Why confirmation would help**
+```
 
-1. **Does it serve a core use case?** If no → defer.
-2. **Can the app function without it?** If yes → probably defer.
-3. **Is it table stakes for the category?** Even table-stakes features
-   get deferred if they don't serve the core use cases.
-4. **Is it simple to build?** Complexity tips borderline features to deferred.
+Prefer 5-12 questions total. If there are none, write `No material open questions.`
 
-Write the core use cases explicitly in the PRD (in the Overview section)
-so the cut decisions are traceable.
-
-## Decision Rules
-
-| Rule | Guidance |
-|:-----|:---------|
-| Serves core use case | MVP — this is why the app exists |
-| Table stakes + core use case | MVP |
-| Table stakes but NOT core | Defer — prevalence alone doesn't justify inclusion |
-| Half have it | Defer unless it directly serves a core use case |
-| Few competitors have it | Defer unless the brief explicitly calls for it |
-| Brief explicitly wants it | MVP regardless of competitor prevalence |
-| Requires separate build target | Always defer. Watch, widgets, extensions are out of scope — no exceptions |
-| Core retention loop | MVP only if it serves a core use case. Streaks/goals for the sake of engagement are not enough |
+---
 
 ## Rules
 
 | Rule | Constraint |
 |:-----|:-----------|
-| Brief is optional | If no brief, derive everything from baseline + research |
-| Brief is truth | If brief exists and conflicts with baseline, brief wins |
-| Cut ruthlessly | When in doubt, defer. A smaller MVP that ships is better than a complete one that doesn't |
-| Shadow, don't innovate | Don't invent new features. Replicate what's proven |
-| Scope each feature | Every MVP feature needs exhaustive scope: included behaviors, excluded behaviors, edge cases, error states, data shown, interaction patterns. An AI agent must be able to design and implement from this description alone |
-| Be decisive | Make the call on every feature. In or out, with rationale |
-| Foundation is Epic 1 | Always. Technical scaffolding, no user-facing features |
-| Onboarding is second-to-last | Always. Non-negotiable. Apply the onboarding principles |
-| Paywall is last | Always. Immediately after onboarding. Always has a skip button |
-| App only | No watch apps, widgets, extensions, App Clips, or any other separate build target. Always defer |
-| Epics, not flat lists | Every feature belongs to an epic. No orphan features |
-| User stories required | Each feature needs 1-3 user stories for downstream planning |
-| AI-consumable | This PRD is consumed by AI agents for design and planning. Every section must be self-contained, unambiguous, and complete. Make it easy to move features between epics and deferred |
+| Shadow, do not innovate | Prefer the dominant competitor pattern |
+| Fill gaps automatically | Use majority defaults before asking humans |
+| Label uncertainty | High / medium / assumed where relevant |
+| Keep the build coherent | Do not defer obvious support flows that the visible product needs |
+| Defer only deliberate non-MVP scope | Not because evidence was incomplete |
+| Human Q&A must stay small | Ask only what materially changes scope or business behavior |
+| AI-consumable | The PRD must remain the main source of truth for downstream automation |

@@ -1,23 +1,22 @@
-# Protocol: Feature Baseline
+# Protocol: Parity Baseline
+
+Merge per-app evidence files into a parity-first baseline for PRD generation.
+Do not compress the market into a pure demand summary. Preserve what is common,
+what is likely required, and which implementation patterns appear strongest.
 
 ## Output Principles
 
-This baseline document will be consumed by an AI agent writing the PRD,
-not a human PM. Write for an agent that has zero context about the category.
+This baseline document will be consumed by an AI agent writing the PRD.
 
-- **Maximum detail.** Every feature entry must include enough detail for an
-  AI agent to write user stories, scope definitions, and screen designs
-  without seeing the original apps. 3-5 sentences per feature minimum.
-- **No lossy merging.** When deduplicating features across apps, preserve
-  all variant details. If three apps implement "reminders" differently,
-  describe all three approaches in the merged entry.
-- **Structured and navigable.** Consistent formatting, clear categories,
-  explicit tagging. The downstream agent will parse this programmatically.
-- **No implicit knowledge.** Define category-specific terms. Explain why
-  a feature is core vs. nice-to-have — show the reasoning chain from
-  user sentiment to the tag.
-
-Merge per-app feature extractions into a unified feature baseline for a PM writing a PRD.
+- **Preserve provenance.** Keep app names, prevalence counts, and notable implementation
+  variants. Downstream agents need to know not just what exists, but whose pattern is being copied.
+- **Preserve confidence.** Separate observed category patterns from inferred support flows
+  and default assumptions.
+- **Favor parity over minimization.** When a feature or support flow is common across strong
+  competitors, treat it as part of the expected product shape even if reviews do not praise it directly.
+- **Be implementation-useful.** Include states, supporting flows, monetization behaviors,
+  navigation conventions, and operational defaults that a real clone would need.
+- **Still be honest.** If evidence is weak, mark it weak. Do not pretend screenshot gaps are certainty.
 
 ## Signals
 - `<signal:update>message</signal:update>` — progress
@@ -26,7 +25,7 @@ Merge per-app feature extractions into a unified feature baseline for a PM writi
 
 ## Inputs
 
-- **Per-app features**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/*/features.md`
+- **Per-app evidence**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/*/features.md`
 - **Web research**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}`
 - **App metadata**: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json`
 
@@ -36,95 +35,139 @@ Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}`
 
 ## Execution
 
-1. Read `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json` for the app list.
-2. Read every `features.md` file (one per app folder).
-3. Read `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}` — includes features from apps not in top charts.
-4. `<signal:update>building baseline from N apps + web research</signal:update>`
-5. **Identify core use cases first.** Before listing features, study the user
-   sentiment (what users love and hate) and the feature landscape. Ask:
-   "Why do people download apps in this category? What job are they hiring
-   the app to do?" Distill this into 1-3 core use cases. These are the
-   reasons the category exists — derived from user behavior, not feature counts.
-6. Merge ALL features — from screenshot analysis AND web research — into one deduplicated list. Same concept = one entry.
-7. **Tag every feature** as either `core` (directly serves a core use case)
-   or `nice-to-have` (doesn't directly serve one). Base this on user sentiment,
-   not prevalence. A feature in 5/5 apps that no user mentions caring about
-   is still a nice-to-have.
-8. Within each tag, order by prevalence — universal features first, niche last.
-9. Write `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}` in the format below.
-10. `<signal:completed>baseline: X features (Y core, Z nice-to-have) from N apps</signal:completed>`
+1. Read `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json`.
+2. Read every `features.md` file.
+3. Read `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}`.
+4. `<signal:update>building parity baseline from N apps + web research</signal:update>`
+5. Identify the dominant product shape:
+   - common core use cases
+   - common navigation shell
+   - common onboarding pattern
+   - common monetization model
+   - common support flows needed to make the visible product usable
+6. Merge all evidence into three buckets:
+   - **Observed market patterns** — clearly visible or explicit across one or more apps
+   - **Supported inferred patterns** — strongly implied by multiple apps, reviews, or market norms
+   - **Default parity assumptions** — standard production behaviors likely required for a credible clone
+7. For each feature or flow, record:
+   - prevalence count (`X / N apps`)
+   - representative apps
+   - notable variants
+   - confidence (`high`, `medium`, `low`)
+   - whether it is part of the likely MVP parity surface or a clear defer candidate
+8. Write `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_FINDINGS}}` in the format below.
+9. `<signal:completed>baseline: X observed patterns, Y inferred patterns, Z parity assumptions</signal:completed>`
 
 ## Output Format
 
 ```markdown
-# Feature Baseline
+# Parity Baseline
 
-> Based on N competitor apps in [category].
+> Based on N competitor apps plus web research.
 
-## Core Use Cases
+## Category Shape
 
-Why people download apps in this category. Derived from user sentiment
-and behavior patterns — what users actually care about, not what
-competitors decided to build.
-
-1. **[Use case]** — one sentence. What job the user is hiring the app to do.
+### Core Use Cases
+1. **[Use case]** — what job this category primarily solves.
 2. **[Use case]** — ...
 3. **[Use case]** — ... (if applicable)
 
-## Core Features
+### Dominant Product Shape
 
-Features that directly serve the core use cases above.
-Each feature is tagged with which use case it serves.
-Ordered by prevalence within this group.
+- **Navigation shell** — tab bar / stack / mixed, with evidence
+- **Primary retention loop** — what brings users back repeatedly
+- **Onboarding style** — wizard / immediate action / preference capture / mixed
+- **Monetization model** — subscription / freemium / one-time. Dominant price point. Trial norms
 
-### [Category]
+## Observed Market Patterns
 
-- **Feature name** `→ use case N` — what it does, how the user interacts with it, what data it displays, what states exist (empty, populated, error), common implementation patterns observed across competitors, and any notable UX variations. 3-5 sentences with enough detail for an AI agent to write complete user stories and scope definitions.
-
-- **Feature name** `→ use case N` — ...
-
-### [Category]
-
-- ...
-
-## Nice-to-Have Features
-
-Features that exist across competitors but don't directly serve a core
-use case. Common ≠ essential. Ordered by prevalence.
+Things clearly visible in screenshots, store copy, or repeated explicit review language.
 
 ### [Category]
 
-- **Feature name** — what it does. Why it's nice-to-have (e.g., "no user
-  sentiment supports this", "engagement mechanic, not core job").
+- **Feature or flow name**
+  - **Prevalence**: X / N apps
+  - **Representative apps**: App A, App B, App C
+  - **What it does**: detailed description
+  - **States and support flows**: loading, empty, error, create/edit/delete, settings, detail, etc.
+  - **Implementation variants**: how different competitors handle it
+  - **Confidence**: high
+  - **Parity recommendation**: include / likely include / defer
 
-- ...
+## Supported Inferred Patterns
 
-## Navigation Patterns
+Things not always shown end-to-end, but strongly implied by evidence.
 
-Common navigation and information architecture patterns observed across apps.
+### [Category]
 
-## Onboarding Patterns
+- **Feature or support flow**
+  - **Prevalence**: X / N apps directly or indirectly support this
+  - **Evidence chain**: why this is inferred
+  - **Likely behavior**: what a clone should probably implement
+  - **Confidence**: medium
+  - **Parity recommendation**: include / likely include / defer
 
-Common onboarding flows observed. What information is typically collected,
-what choices users make on first run.
+## Default Parity Assumptions
 
-## User Sentiment
+Production-grade behaviors to assume when evidence is incomplete but omission would
+make the cloned app feel obviously unfinished.
 
-Common themes from user reviews across all apps.
-- What users consistently love (top 3-5 themes)
-- What users consistently hate (top 3-5 themes)
+- **Assumption**
+  - **Why assume it**: standard for apps in this category or required by visible flows
+  - **Typical implementation**: what most credible apps do
+  - **Confidence**: low / medium
+  - **Use only if**: condition for applying the assumption
 
-Use actual user language where possible. No app names.
+## Navigation And Screen Clues
+
+- **Confirmed screens** — clearly visible or explicit
+- **Likely supporting screens** — strongly implied
+- **Standard utility screens** — settings, edit, detail, manage subscription, restore purchases, etc.
+- **Primary flow patterns** — first launch, core loop, settings/account loop
+
+## Pricing Landscape
+
+Concrete numbers from app_details.json and per-app evidence. No vague descriptions.
+
+- **Dominant model** — subscription / freemium / one-time, with count (X / N apps)
+- **Price points** — exact prices per competitor (app name: $X.XX/period)
+- **Trial norms** — length, payment method required, per competitor
+- **Free vs. paid line** — what features are typically free, what requires subscription
+- **Outliers** — any competitor with a notably different approach
+
+## Onboarding Clues
+
+- **Observed onboarding steps**
+- **Likely missing onboarding steps**
+
+## Paywall Clues
+
+- **Observed paywall behaviors** — placement, timing, offer framing per competitor
+- **Likely paywall support behaviors** — restore purchases, skip/close, trial disclosure, manage subscription entry
+
+## Sentiment Signals
+
+- **What users repeatedly love**
+- **What users repeatedly hate**
+- **What causes churn or switching**
+
+## Gaps That Still Matter
+
+Only include unresolved gaps that materially change product scope, architecture, or monetization.
+
+- **Question**
+  - **Why it matters**
+  - **Best default if unanswered**
+  - **Confidence**
 ```
 
 ## Rules
 
 | Rule | Constraint |
 |:-----|:-----------|
-| No app names | This is a category baseline, not a comparison. Don't mention which app has what |
-| Normalize | Same concept = one entry. "Streak tracking" not "streaks" vs "streak counter" |
-| Use cases from sentiment | Core use cases come from what users say, not from feature prevalence |
-| Tag honestly | A feature in every app is still nice-to-have if no user cares about it |
-| Describe, don't prescribe | Describe what the feature does. Don't recommend whether to build it |
-| Maximum detail | An AI agent reading this must be able to write user stories, scope features, and design screens without seeing the original apps. 3-5 sentences per feature minimum. Include all implementation variants observed across competitors |
-| Order by prevalence | Universal features first, rare/niche features last within each category |
+| Keep app names | Provenance matters for shadowing |
+| Preserve prevalence | Always note counts where possible |
+| Separate buckets | Observed, inferred, and assumed must not collapse together |
+| Parity over purity | Common support flows matter even if users rarely praise them explicitly |
+| No fake certainty | Weak evidence must stay weak |
+| Implementation detail required | Include support states and production behaviors, not just headline features |

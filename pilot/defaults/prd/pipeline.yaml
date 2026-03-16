@@ -16,6 +16,7 @@ vars:
   PILOT_RESEARCH: "data/research.md"       # Web research (output of research stage)
   PILOT_BRIEF: "brief.md"                 # User brief (optional, relative to config dir)
   PILOT_PRD: "data/prd.md"               # Final PRD (output of prd stage)
+  PILOT_PRD_QA: "data/prd_qa.md"         # Human Q&A pack for unresolved material uncertainties
   PILOT_LANGUAGES: "English, Spanish, German, French, Portuguese, Dutch"
   PILOT_PRD_ROUND: "1"                  # Current refinement round (managed by refine_critique)
   PILOT_PRD_REFINE_ROUNDS: "3"          # Max refinement rounds (safety cap)
@@ -52,6 +53,9 @@ stages:
     prompt: |
       {{file:prompts/research.md}}
     runner:
+      executor: gemini
+      model: gemini-3-pro-preview
+    fallback_runner:
       executor: claude-code
       model: opus
     on_signal:

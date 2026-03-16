@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fetch App Store reviews via Apple RSS feed (free, no API key).
-# Reads app IDs from apps.json, saves reviews per app folder.
+# Fetch App Store reviews + app details (What's New, pricing) per competitor.
+# Reads app IDs from apps.json, saves reviews.json and app_details.json per app folder.
 
 OUTPUT_DIR="$PILOT_CONFIG_DIR/$PILOT_APPTWEAK_OUTPUT_DIR"
 APPS_JSON="$OUTPUT_DIR/apps.json"
@@ -14,9 +14,8 @@ if [ ! -f "$APPS_JSON" ]; then
   exit 1
 fi
 
-# Extract app IDs and slugified folder names from apps.json
 APP_COUNT=$(python3 -c "import json; apps=json.load(open('$APPS_JSON')); print(len(apps))")
-echo "<signal:update>fetching reviews for $APP_COUNT apps</signal:update>"
+echo "<signal:update>fetching reviews + app details for $APP_COUNT apps</signal:update>"
 
 python3 -c "
 import json, os, urllib.request, sys
@@ -40,6 +39,41 @@ for app in apps:
         print(f'  skip {title}: folder {app_folder} missing', file=sys.stderr)
         continue
 
+    # --- App details via iTunes Lookup API (What's New, pricing, version) ---
+    lookup_url = f'https://itunes.apple.com/lookup?id={app_id}&country={country}'
+    try:
+        req = urllib.request.Request(lookup_url, headers={'User-Agent': 'Mozilla/5.0'})
+        resp = urllib.request.urlopen(req, timeout=30)
+        lookup_data = json.loads(resp.read())
+        results = lookup_data.get('results', [])
+        if results:
+            r = results[0]
+            details = {
+                'releaseNotes': r.get('releaseNotes', ''),
+                'version': r.get('version', ''),
+                'currentVersionReleaseDate': r.get('currentVersionReleaseDate', ''),
+                'price': r.get('price', 0),
+                'formattedPrice': r.get('formattedPrice', ''),
+                'currency': r.get('currency', ''),
+                'averageUserRating': r.get('averageUserRating', 0),
+                'userRatingCount': r.get('userRatingCount', 0),
+                'description': r.get('description', ''),
+                'primaryGenreName': r.get('primaryGenreName', ''),
+                'contentAdvisoryRating': r.get('contentAdvisoryRating', ''),
+                'fileSizeBytes': r.get('fileSizeBytes', ''),
+                'minimumOsVersion': r.get('minimumOsVersion', ''),
+                'languageCodesISO2A': r.get('languageCodesISO2A', []),
+            }
+            details_path = os.path.join(app_folder, 'app_details.json')
+            with open(details_path, 'w') as f:
+                json.dump(details, f, indent=2, ensure_ascii=False)
+            print(f'  {title}: details fetched (v{details[\"version\"]}, {details[\"formattedPrice\"]})')
+        else:
+            print(f'  {title}: no lookup results', file=sys.stderr)
+    except Exception as e:
+        print(f'  {title}: lookup failed: {e}', file=sys.stderr)
+
+    # --- Reviews via Apple RSS feed ---
     reviews = []
     for page in range(1, max_pages + 1):
         url = (
@@ -79,4 +113,4 @@ for app in apps:
     print(f'  {title}: {len(reviews)} reviews')
 "
 
-echo "<signal:ready>reviews fetched</signal:ready>"
+echo "<signal:ready>reviews + details fetched</signal:ready>"

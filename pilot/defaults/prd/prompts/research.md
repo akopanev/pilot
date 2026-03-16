@@ -1,4 +1,4 @@
-# Protocol: Web Research
+# Protocol: Market Research
 
 ## Output Principles
 
@@ -16,9 +16,9 @@ Write for an agent that has zero prior context about this market or category.
 - **Source everything.** For every claim, note where it came from (subreddit,
   review, article, forum). The downstream agent needs to assess credibility.
 
-Demand-side research — understand what users WANT, what jobs they're hiring
-apps for, what's broken, what works. Competitor features are evidence of
-demand, not the goal. Organize findings by user need, not by app.
+Two-lens research: **demand-side** (what users want) and **supply-side** (what
+competitors actually ship). Both are required. The goal is to shadow existing
+apps — we need to understand demand AND know exactly what the market delivers.
 
 ## Signals
 - `<signal:update>message</signal:update>` — progress
@@ -28,6 +28,7 @@ demand, not the goal. Organize findings by user need, not by app.
 ## Inputs
 
 - **Keywords**: `{{var:PILOT_KEYWORDS}}`
+- **Competitor data** (if available): `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_APPTWEAK_OUTPUT_DIR}}/apps.json`
 
 ## Output
 
@@ -35,43 +36,68 @@ Write to: `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}`
 
 ## Execution
 
-1. `<signal:update>researching demand: {{var:PILOT_KEYWORDS}}</signal:update>`
-2. **Search for user voice first.** For each keyword:
+1. `<signal:update>researching market: {{var:PILOT_KEYWORDS}}</signal:update>`
+
+2. **Read competitor data.** If `apps.json` exists, read it. Extract app names,
+   IDs, descriptions, and `app_details.json` from each app folder (contains
+   releaseNotes, pricing, version history). These are the top competitors —
+   research them by name in addition to keyword searches.
+
+3. **Demand-side research.** For each keyword:
    - `{keyword} app reddit` — what real users say
    - `{keyword} frustrated reddit` / `"switched from" {keyword} app`
    - `{keyword} app comparison` — what people weigh when choosing
    - `best {keyword} apps 2025` / `best {keyword} apps 2026`
    - `{keyword} app review`
-3. **Read results with a demand lens.** For every source, extract:
+
+4. **Read results with a demand lens.** For every source, extract:
    - What users say they WANT (explicit demand)
    - What users complain about (unmet demand)
    - What users praise (met demand — validated use case)
    - Why users switch apps (demand the old app failed to meet)
-4. **For notable apps discovered** — research them, but through the demand
-   lens. Don't just list features. Ask: what demand does this app serve
-   that others don't? What do its users specifically love/hate?
-5. **Group everything by demand signal**, not by app. See output format.
-6. Write `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}` in the format below.
-7. `<signal:completed>web research complete</signal:completed>`
+
+5. **Supply-side research.** For each top competitor (from apps.json + discovered):
+   - `"{app name}" app features` — what the app ships
+   - `"{app name}" app review` — detailed reviews from blogs/sites
+   - `"{app name}" pricing` / `"{app name}" subscription` — exact pricing
+   - `"{app name}" app update` / `"{app name}" what's new` — recent changes
+   - Note their App Store description and releaseNotes from app_details.json
+
+6. **For each competitor, build a supply-side profile:**
+   - What they ship (feature inventory from reviews, articles, store description)
+   - Navigation structure (tabs, flows) if reviewers or articles describe it
+   - Pricing model: free tier, subscription tiers, exact prices, trial length
+   - Recent updates: what they've been investing in (from What's New / articles)
+   - What power users say about workflow and daily usage patterns
+
+7. Write `{{var:PILOT_CONFIG_DIR}}/{{var:PILOT_RESEARCH}}` in the format below.
+8. `<signal:completed>web research complete</signal:completed>`
 
 ## What to Look For
 
+**Demand side:**
 - **What users want** — "I wish an app would...", "I need...", "looking for..."
 - **What's broken** — "I hate that...", "why can't any app...", "I switched because..."
 - **What works** — "I love that...", "finally an app that...", "this is why I pay for..."
-- **What competitors ship** — features across the category, as evidence of validated demand
 - **What makes users stay** — retention signals, the moments that hook people
 - **What makes users leave** — churn triggers, deal-breakers
+
+**Supply side:**
+- **What competitors ship** — complete feature sets, not just highlights
+- **How competitors monetize** — exact pricing, trial lengths, what's free vs paid
+- **What competitors invest in** — recent updates, new features, direction
+- **How competitors structure** — navigation, flows, screens described by users/reviewers
 
 ## Output Format
 
 ```markdown
-# Web Research
+# Market Research
 
 > Keywords: ...
 > Sources searched: N
+> Competitors profiled: N
 
-## Demand Signals
+## Part 1: Demand Signals
 
 Group findings by what users want — each signal is a user need or job-to-be-done.
 Order by strength of signal (how many sources, how passionately expressed).
@@ -82,38 +108,67 @@ Order by strength of signal (how many sources, how passionately expressed).
 Include 3-5 representative quotes that capture the demand.
 
 **Evidence from competitors**: which apps address this need and how.
-Brief — app name + approach, not full feature lists.
 
 **Unmet demand**: what's still broken or missing. What users wish was better.
 
 ### [Next User Need]
 ...
 
-## Pain Points
+## Part 2: Competitor Profiles
+
+One section per top competitor. This is supply-side intelligence.
+
+### [App Name]
+
+**Positioning**: what the App Store description says (summarize key claims).
+
+**Feature inventory**: every feature discoverable from reviews, articles, store
+description, and user discussions. Group by category.
+
+**Pricing**:
+- Free tier: what's included
+- Subscription: exact price(s), billing period(s), trial length
+- What unlocks on subscribe
+- Source of pricing info
+
+**Recent updates** (from What's New / releaseNotes / articles):
+- Version X.Y: what changed
+- Version X.Z: what changed
+- Direction: what are they investing in
+
+**Navigation / structure**: how users describe the app's layout (tabs, screens,
+flows) from reviews and articles. Include direct quotes if available.
+
+**User verdict**: what loyal users say about daily usage patterns, workflow,
+what keeps them. What churned users cite as reasons for leaving.
+
+### [Next Competitor]
+...
+
+## Part 3: Pain Points
 
 Frustrations that cut across the category. These aren't tied to one need —
 they're universal complaints.
 
 - **Pain point** — what users hate, direct quotes, how widespread
 
-## What Works
+## Part 4: What Works
 
 The moments users love. Evidence for what a good app in this category
 feels like.
 
 - **What works** — direct user language, which apps nail this
 
-## Notable Apps
+## Part 5: Pricing Landscape
 
-Apps discovered outside the top charts that are worth knowing about.
-Keep this brief — the demand signals above are the primary output.
+Summary across all competitors:
+- Dominant model (subscription / freemium / one-time)
+- Price range
+- Trial norms (length, with/without payment method)
+- What's typically free vs. paid
+- Any outlier approaches
 
-### [App Name]
-**What it is**: one sentence.
-**Why it's notable**: what demand it serves differently.
-**Key features**: only the ones relevant to demands identified above.
-
-## Trends
+## Part 6: Trends
 
 Emerging patterns. New approaches gaining traction.
 
@@ -124,10 +179,11 @@ Emerging patterns. New approaches gaining traction.
 
 | Rule | Constraint |
 |:-----|:-----------|
-| Demand first | Organize by user need, not by app. Apps are evidence |
-| User voice | Direct quotes are the most valuable data. Collect ALL relevant quotes — do not limit or summarize to save space. Every quote adds context for downstream agents |
-| Competitor features = demand signal | "5/5 apps have X" means the market validated demand for X. Note it as evidence |
+| Two lenses | Both demand-side AND supply-side research are required |
+| User voice | Direct quotes are the most valuable data. Collect ALL relevant quotes |
+| Per-competitor profiles | Every top competitor gets a dedicated supply-side section |
+| Pricing must be concrete | Exact numbers. "Premium subscription available" is not enough — find the price |
+| Recent updates required | For each competitor, find What's New / changelog / recent articles |
 | Source everything | Note where insights came from |
 | Recency matters | Prefer 2025-2026 sources. Ignore anything older than 2 years |
-| Go deep on new apps | When you find a notable app, research it — but through the demand lens |
-| No recommendations | Report demand signals. Downstream stages make the decisions |
+| No recommendations | Report signals and facts. Downstream stages make the decisions |
