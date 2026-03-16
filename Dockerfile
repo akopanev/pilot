@@ -10,9 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN corepack enable
 
 # Install CLI tools
-RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
+RUN npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli opencode-ai \
     && command -v claude >/dev/null \
-    && command -v codex >/dev/null
+    && command -v codex >/dev/null \
+    && command -v gemini >/dev/null
 
 # Install ticket (tk) — git-backed issue tracker (full clone for plugins)
 RUN git clone --depth 1 https://github.com/wedow/ticket.git /opt/ticket \

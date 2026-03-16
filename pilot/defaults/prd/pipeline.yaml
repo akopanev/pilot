@@ -102,8 +102,7 @@ stages:
       executor: codex
       model: gpt-5.4
     on_signal:
-      completed: review_gemini
-      default: __fail__
+      default: review_gemini
 
   review_gemini:
     pre_step: |
@@ -114,8 +113,7 @@ stages:
       executor: gemini
       model: gemini-3.1-pro-preview
     on_signal:
-      completed: refine_critique
-      default: __fail__
+      default: refine_critique
 
   refine_critique:
     prompt: |
@@ -125,5 +123,4 @@ stages:
       model: opus
     on_signal:
       repeat: review_codex
-      converged: __succeed__
-      default: __fail__
+      default: __succeed__
