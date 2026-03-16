@@ -95,7 +95,7 @@ stages:
 
   review_codex:
     pre_step: |
-      echo "PILOT_REVIEW_OUTPUT=data/review_codex.md" >> "$PILOT_CONFIG_DIR/.pilot/vars"
+      echo "PILOT_REVIEW_OUTPUT=data/review_codex.md" >> "$PILOT_CONFIG_DIR/vars"
     prompt: |
       {{file:prompts/review.md}}
     runner:
@@ -107,7 +107,7 @@ stages:
 
   review_gemini:
     pre_step: |
-      echo "PILOT_REVIEW_OUTPUT=data/review_gemini.md" >> "$PILOT_CONFIG_DIR/.pilot/vars"
+      echo "PILOT_REVIEW_OUTPUT=data/review_gemini.md" >> "$PILOT_CONFIG_DIR/vars"
     prompt: |
       {{file:prompts/review.md}}
     runner:
