@@ -1,7 +1,8 @@
-"""Codex executor — separate stderr (progress) / stdout (response)."""
+"""Codex executor — streaming JSONL events via --json mode."""
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import threading
@@ -10,11 +11,51 @@ from pilot.executors.result import ExecutorResult, kill_process_group, start_can
 from pilot.signals import SignalScanner
 
 
-class CodexExecutor:
-    """Runs codex CLI with split stderr/stdout handling.
+def _extract_text(event: dict) -> str | None:
+    """Extract agent message text from a codex JSONL event.
 
-    stderr: progress display (filtered).
-    stdout: the actual response.
+    Returns the text for agent_message item.completed events,
+    None for everything else.
+    """
+    if event.get("type") != "item.completed":
+        return None
+    item_type = event.get("item", {}).get("type")
+    if item_type != "agent_message":
+        return None
+    return event.get("item", {}).get("text", "")
+
+
+def _extract_progress(event: dict) -> str | None:
+    """Extract a human-readable progress line from non-message events."""
+    etype = event.get("type", "")
+    item = event.get("item", {})
+    itype = item.get("type", "")
+
+    if etype == "item.completed" and itype == "command_execution":
+        cmd = item.get("command", "")
+        status = item.get("status", "")
+        code = item.get("exit_code")
+        suffix = f" (exit {code})" if code is not None else ""
+        return f"$ {cmd} [{status}{suffix}]"
+
+    if etype == "item.completed" and itype == "file_change":
+        changes = item.get("changes", [])
+        parts = [f"{c.get('kind', '?')} {c.get('path', '?')}" for c in changes]
+        return "files: " + ", ".join(parts) if parts else None
+
+    if etype == "item.started" and itype == "command_execution":
+        cmd = item.get("command", "")
+        return f"$ {cmd}"
+
+    return None
+
+
+class CodexExecutor:
+    """Runs codex CLI with --json mode for structured JSONL output.
+
+    All events arrive on stdout as JSONL. Agent messages contain the
+    model's response text (including signals). stderr is only used
+    for codex internal logging/errors.
     """
 
     def run(self, prompt: str, model: str | None = None,
@@ -25,7 +66,7 @@ class CodexExecutor:
         effective_model = model or "o3"
         use_docker = os.environ.get("PILOT_DOCKER") == "1"
 
-        cmd = ["codex", "exec"]
+        cmd = ["codex", "exec", "--json"]
         if use_docker:
             cmd.append("--dangerously-bypass-approvals-and-sandbox")
         else:
@@ -36,40 +77,63 @@ class CodexExecutor:
             "-c", "model_reasoning_effort=xhigh",
             "-c", "stream_idle_timeout_ms=3600000",
         ]
-        cmd.append(prompt)
 
         proc = subprocess.Popen(
             cmd,
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             start_new_session=True,
         )
 
+        # Send prompt via stdin (avoids shell escaping issues with large prompts)
+        if proc.stdin:
+            proc.stdin.write(prompt)
+            proc.stdin.close()
+
         start_cancel_watchdog(cancel, proc)
 
+        # Capture stderr tail for error reporting
         stderr_result: dict = {"last_lines": [], "error": None}
         stderr_thread = threading.Thread(
-            target=self._process_stderr,
-            args=(proc.stderr, stderr_result, on_output),
+            target=self._capture_stderr,
+            args=(proc.stderr, stderr_result),
             daemon=True,
         )
         stderr_thread.start()
 
-        stdout_parts: list[str] = []
+        output_parts: list[str] = []
         all_signals = []
         stdout_error = None
         scanner = SignalScanner(known_signals)
 
         try:
             for line in proc.stdout:
-                stdout_parts.append(line)
-                if on_output:
-                    on_output(line)
-                for sig in scanner.feed(line):
-                    all_signals.append(sig)
-                    if on_signal:
-                        on_signal(sig)
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                # Agent message — extract text, scan for signals
+                text = _extract_text(event)
+                if text:
+                    output_parts.append(text)
+                    if on_output:
+                        on_output(text)
+                    for sig in scanner.feed(text):
+                        all_signals.append(sig)
+                        if on_signal:
+                            on_signal(sig)
+                    continue
+
+                # Other events — show progress
+                progress = _extract_progress(event)
+                if progress and on_output:
+                    on_output(progress)
+
         except KeyboardInterrupt:
             raise
         except Exception as e:
@@ -86,21 +150,7 @@ class CodexExecutor:
             if on_signal:
                 on_signal(sig)
 
-        stdout_content = "".join(stdout_parts)
-
-        # DEBUG: log what actually arrived on each stream
-        import sys
-        print(f"\n[CODEX DEBUG] stdout length: {len(stdout_content)}", file=sys.stderr)
-        print(f"[CODEX DEBUG] stdout lines: {len(stdout_parts)}", file=sys.stderr)
-        if stdout_content:
-            preview = stdout_content[:500].replace('\n', '\\n')
-            print(f"[CODEX DEBUG] stdout preview: {preview}", file=sys.stderr)
-        else:
-            print("[CODEX DEBUG] stdout: EMPTY", file=sys.stderr)
-        print(f"[CODEX DEBUG] signals found: {len(all_signals)}", file=sys.stderr)
-        for s in all_signals:
-            print(f"[CODEX DEBUG]   signal: {s.name} = {s.content[:80]}", file=sys.stderr)
-        print(f"[CODEX DEBUG] stderr last lines: {stderr_result['last_lines']}", file=sys.stderr)
+        stdout_content = "".join(output_parts)
 
         error = None
         if stderr_result["error"]:
@@ -121,15 +171,9 @@ class CodexExecutor:
         )
 
     @staticmethod
-    def _process_stderr(stream, result: dict,
-                        on_output: callable = None) -> None:
-        """Read stderr for progress display only.
-
-        Signals are never parsed from stderr — codex echoes the prompt on
-        stderr, which would cause false signal detections from examples
-        in the prompt text.  Only stdout (the actual response) is parsed.
-        """
-        max_tail = 5
+    def _capture_stderr(stream, result: dict) -> None:
+        """Capture stderr tail for error reporting."""
+        max_tail = 10
         tail: list[str] = []
 
         try:
@@ -138,8 +182,6 @@ class CodexExecutor:
                 if not stripped:
                     continue
                 stored = stripped[:256] + "..." if len(stripped) > 256 else stripped
-                if on_output:
-                    on_output(stored)
                 tail.append(stored)
                 if len(tail) > max_tail:
                     tail.pop(0)
