@@ -1,6 +1,6 @@
-# Design pipeline — PRD → screens → theme → enriched screens
+# Design pipeline — PRD → screens → theme → detail → review loop → Figma briefs
 # Runs after PRD pipeline, before plan pipeline.
-# Pre-pipeline installs gluestack agent-skills + gluestack-ui.
+# Final output: self-contained per-screen briefs for Figma Make.
 version: "0.1"
 starting: screens
 
@@ -14,35 +14,11 @@ vars:
   PILOT_SCREENS_DIR: "data/screens"                      # Per-screen detail files ({screen_id}.yaml)
   PILOT_THEME: "data/theme.yaml"
   PILOT_DESIGN_REFS: "../../design-refs"                # Reference designs — screenshots, mockups (optional)
-
-pre_pipeline: |
-  set -euo pipefail
-
-  PROJECT_DIR="$PILOT_CONFIG_DIR/../../"
-  MOBILE_DIR="$PROJECT_DIR/mobile"
-
-  if [ ! -d "$PROJECT_DIR" ]; then
-    echo "Project root not found: $PROJECT_DIR"
-    exit 1
-  fi
-
-  if ! command -v npx &>/dev/null; then
-    echo "npx not found — install Node.js first"
-    exit 1
-  fi
-
-  # --- 1. Agent skills (AI-readable component docs, project root) ---
-  cd "$PROJECT_DIR"
-  if [ -d ".agents/skills/gluestack-ui-v4" ]; then
-    echo "gluestack agent-skills already installed"
-  else
-    echo "Installing gluestack agent-skills..."
-    npx skills add gluestack/agent-skills --skill gluestack-ui-v4 -y 2>&1 || {
-      echo "Warning: failed to install agent-skills, continuing without them"
-    }
-  fi
-
-  echo "Pre-pipeline OK"
+  PILOT_BRIEFS_DIR: "data/briefs"                       # Self-contained per-screen briefs for Figma Make
+  PILOT_REVIEW_CODEX: "data/review_codex.md"            # Codex design review
+  PILOT_REVIEW_GEMINI: "data/review_gemini.md"          # Gemini design review
+  PILOT_DESIGN_ROUND: "1"                               # Current refinement round
+  PILOT_DESIGN_REFINE_ROUNDS: "3"                       # Max refinement rounds
 
 stages:
   screens:
@@ -52,8 +28,7 @@ stages:
       executor: claude-code
       model: opus
     on_signal:
-      completed: theme
-      default: __fail__
+      default: theme
 
   theme:
     prompt: |
@@ -62,8 +37,7 @@ stages:
       executor: claude-code
       model: opus
     on_signal:
-      completed: detail
-      default: __fail__
+      default: detail
 
   detail:
     prompt: |
@@ -72,5 +46,45 @@ stages:
       executor: claude-code
       model: opus
     on_signal:
-      completed: __succeed__
-      default: __fail__
+      default: review_codex
+
+  review_codex:
+    pre_step: |
+      echo "PILOT_REVIEW_OUTPUT=data/review_codex.md" >> "$PILOT_CONFIG_DIR/vars"
+    prompt: |
+      {{file:prompts/review.md}}
+    runner:
+      executor: codex
+      model: gpt-5.4
+    on_signal:
+      default: review_gemini
+
+  review_gemini:
+    pre_step: |
+      echo "PILOT_REVIEW_OUTPUT=data/review_gemini.md" >> "$PILOT_CONFIG_DIR/vars"
+    prompt: |
+      {{file:prompts/review.md}}
+    runner:
+      executor: gemini
+      model: gemini-3.1-pro-preview
+    on_signal:
+      default: refine_critique
+
+  refine_critique:
+    prompt: |
+      {{file:prompts/refine_critique.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      repeat: review_codex
+      default: briefs
+
+  briefs:
+    prompt: |
+      {{file:prompts/briefs.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      default: __succeed__

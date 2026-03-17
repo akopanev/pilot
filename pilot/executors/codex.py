@@ -88,6 +88,20 @@ class CodexExecutor:
 
         stdout_content = "".join(stdout_parts)
 
+        # DEBUG: log what actually arrived on each stream
+        import sys
+        print(f"\n[CODEX DEBUG] stdout length: {len(stdout_content)}", file=sys.stderr)
+        print(f"[CODEX DEBUG] stdout lines: {len(stdout_parts)}", file=sys.stderr)
+        if stdout_content:
+            preview = stdout_content[:500].replace('\n', '\\n')
+            print(f"[CODEX DEBUG] stdout preview: {preview}", file=sys.stderr)
+        else:
+            print("[CODEX DEBUG] stdout: EMPTY", file=sys.stderr)
+        print(f"[CODEX DEBUG] signals found: {len(all_signals)}", file=sys.stderr)
+        for s in all_signals:
+            print(f"[CODEX DEBUG]   signal: {s.name} = {s.content[:80]}", file=sys.stderr)
+        print(f"[CODEX DEBUG] stderr last lines: {stderr_result['last_lines']}", file=sys.stderr)
+
         error = None
         if stderr_result["error"]:
             error = stderr_result["error"]
