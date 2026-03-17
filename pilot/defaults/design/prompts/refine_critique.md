@@ -69,7 +69,8 @@ and full PRD coverage.
     - No substantive changes → converged
     - Changed and under round cap → repeat
     - Round cap reached → converged
-11. Emit the updated round counter before the domain signal.
+11. Emit the updated round counter before the domain signal:
+    `<signal:var key=PILOT_DESIGN_ROUND>N</signal:var>` (where N is the next round number).
 
 ## Changelog Format
 

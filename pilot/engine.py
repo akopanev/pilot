@@ -69,11 +69,15 @@ class PipelineEngine:
     def _sync_env(self) -> None:
         """Export vars to file and os.environ.
 
-        Writes config vars to the vars file, then loads everything
-        (config + agent-emitted vars) into os.environ.
+        Writes config vars as defaults (won't overwrite agent-set values),
+        then loads everything into os.environ.
         """
+        from pilot.vars import read_vars
+
+        existing = read_vars(self.vars_path)
         for key, value in self.config.vars.items():
-            write_var(self.vars_path, key, value)
+            if key not in existing:
+                write_var(self.vars_path, key, value)
 
         export_vars(self.vars_path)
 

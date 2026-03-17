@@ -62,7 +62,8 @@ questions for a human.
    - no substantive changes -> converged
    - changed and under cap -> repeat
    - cap reached -> converged
-13. Emit the updated round counter before the domain signal.
+13. Emit the updated round counter before the domain signal:
+    `<signal:var key=PILOT_PRD_ROUND>N</signal:var>` (where N is the next round number).
 
 ## Changelog Format
 
