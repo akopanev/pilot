@@ -1,10 +1,12 @@
 # Localize pipeline — translate content list into multiple locales
-# Flow: pick_content → localize → write_output → [next content item]
+# Flow: pick_content → localize → save_output → [next item] → merge
 #
 # For each content item:
-#   1. pick_content: extract item, create en output (no LLM — just reshape)
-#   2. localize: LLM translates all non-en locales in one shot
-#   3. write_output: split translations into locale subfolders
+#   1. pick_content: extract item, create en/{id}.json (reshape only)
+#   2. localize: LLM translates all locales, writes data/translations.json
+#   3. save_output: shell distributes translations to {locale}/{id}.json
+# After all items:
+#   4. merge: combine {id}.json files per locale folder into content.json
 version: "0.1"
 starting: pick_content
 
@@ -39,10 +41,10 @@ pre_pipeline: |
 
   mkdir -p "$PILOT_CONFIG_DIR/data"
   TOTAL=$(jq 'length' "$INPUT_FILE")
-  echo "Input: $TOTAL items, Locales: $LOCALES"
+  echo "Input: $TOTAL items, Locales: en (source), $LOCALES"
 
 stages:
-  # Extract next content item, create en output (reshape only)
+  # Extract next content item, create en/{id}.json (reshape only)
   pick_content:
     runner:
       executor: shell
@@ -50,10 +52,10 @@ stages:
         {{file:scripts/pick_content.sh}}
     on_signal:
       ready: localize
-      completed: __succeed__
+      completed: merge
       default: __fail__
 
-  # LLM translates to all non-en locales in one shot
+  # LLM translates to all locales, writes data/translations.json
   localize:
     prompt: |
       {{file:prompts/localize.md}}
@@ -61,16 +63,26 @@ stages:
       executor: claude-code
       model: sonnet
     on_signal:
-      completed: write_output
+      completed: save_output
       failed: __fail__
-      default: write_output
+      default: save_output
 
-  # Split translations.json into locale subfolders, advance to next item
-  write_output:
+  # Distribute translations.json to {locale}/{id}.json files
+  save_output:
     runner:
       executor: shell
       command: |
-        {{file:scripts/write_output.sh}}
+        {{file:scripts/save_output.sh}}
     on_signal:
       completed: pick_content
       default: pick_content
+
+  # Combine all {id}.json per locale into content.json
+  merge:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/merge.sh}}
+    on_signal:
+      completed: __succeed__
+      default: __succeed__

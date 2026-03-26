@@ -16,7 +16,7 @@ if ! jq empty "$TRANSLATIONS_FILE" 2>/dev/null; then
   exit 1
 fi
 
-# Write each locale to its subfolder
+# Distribute each locale entry to its own {locale}/{id}.json
 for LOCALE in $(jq -r 'keys[]' "$TRANSLATIONS_FILE"); do
   LOCALE_DIR="${OUTPUT_DIR}/${LOCALE}"
   mkdir -p "$LOCALE_DIR"
@@ -25,10 +25,10 @@ for LOCALE in $(jq -r 'keys[]' "$TRANSLATIONS_FILE"); do
   OUTPUT_FILE="${LOCALE_DIR}/${ITEM_ID}.json"
 
   jq ".\"${LOCALE}\"" "$TRANSLATIONS_FILE" > "$OUTPUT_FILE"
-  echo "  ${LOCALE}: $OUTPUT_FILE"
+  echo "  ${LOCALE}: ${OUTPUT_FILE}"
 done
 
 # Advance to next content item
 NEXT_INDEX=$((CURRENT_INDEX + 1))
 echo "<signal:var key=CURRENT_INDEX>$NEXT_INDEX</signal:var>"
-echo "<signal:completed>Item $CURRENT_INDEX localized</signal:completed>"
+echo "<signal:completed>Item $CURRENT_INDEX saved</signal:completed>"

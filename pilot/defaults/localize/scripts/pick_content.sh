@@ -27,14 +27,17 @@ jq '{
   type: "article",
   locale: "en",
   canonicalId: .id,
-  meta: { status: "draft" },
+  meta: { status: "published" },
   data: {
     title: .title,
     card_title: .card_title,
     markdown: .article_markdown,
-    imageUrl: .image_url
+    imageUrl: .image_url,
+    sources: .grounding_sources
   }
 }' "${PILOT_CONFIG_DIR}/data/current_content.json" > "${OUTPUT_DIR}/en/${ITEM_ID}.json"
 
 echo "  en: ${OUTPUT_DIR}/en/${ITEM_ID}.json"
+
+echo "<signal:var key=CURRENT_ID>$ITEM_ID</signal:var>"
 echo "<signal:ready>$CURRENT_INDEX</signal:ready>"

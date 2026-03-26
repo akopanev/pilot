@@ -1,6 +1,7 @@
 # Protocol: Localize Content
 
 Locales: `{{var:LOCALES}}`
+Item ID: `{{var:CURRENT_ID}}`
 
 ## Source Content (English)
 
@@ -17,13 +18,16 @@ For each target locale, translate:
 - `card_title`
 - `article_markdown` — preserve all Markdown formatting exactly: headings (`##`), bullet points (`*`), bold (`**`), links
 
+Copy unchanged:
+- `grounding_sources` → `data.sources` (the array of URLs, unchanged)
+
 Do NOT translate:
 - URLs
 - Proper nouns, brand names, or technical terms commonly kept in English (e.g. NEAT, HIIT, Non-Exercise Activity Thermogenesis)
 
 The translation must read naturally in the target language — not word-for-word. Keep the same tone, style, and paragraph structure.
 
-## Output Format
+## Output
 
 Write a single JSON file to:
 
@@ -31,20 +35,21 @@ Write a single JSON file to:
 {{var:PILOT_CONFIG_DIR}}/data/translations.json
 ```
 
-The file must be a JSON object keyed by locale code. Each value uses this exact structure:
+The file must be a JSON object keyed by locale code. Each value uses this structure:
 
 ```json
 {
   "es": {
     "type": "article",
     "locale": "es",
-    "canonicalId": "<source id unchanged>",
-    "meta": { "status": "draft" },
+    "canonicalId": "{{var:CURRENT_ID}}",
+    "meta": { "status": "published" },
     "data": {
       "title": "<translated title>",
       "card_title": "<translated card_title>",
       "markdown": "<translated article_markdown>",
-      "imageUrl": "<source image_url unchanged>"
+      "imageUrl": "<source image_url unchanged>",
+      "sources": ["<source grounding_sources array unchanged>"]
     }
   },
   "fr": { ... },
@@ -70,16 +75,14 @@ Example of a correct `markdown` value:
 
 ## Rules
 
-- Include ALL locales from the list except `en`
-- Each locale entry must have the exact structure shown above
-- `canonicalId` and `imageUrl` are copied unchanged from the source
+- Include ALL locales from the list — do NOT skip any
+- `canonicalId`, `imageUrl`, and `sources` are copied unchanged from the source
 - `type` is always `"article"`
-- `meta.status` is always `"draft"`
+- `meta.status` is always `"published"`
 - Output valid JSON — no trailing commas, no comments
-- Do not include any text outside the JSON file write
 
 ## Signals
 
 - `<signal:update>progress</signal:update>` — progress updates
-- `<signal:completed>done</signal:completed>` — when file is written
+- `<signal:completed>done</signal:completed>` — when the file is written
 - `<signal:failed>reason</signal:failed>` — if translation cannot be completed
