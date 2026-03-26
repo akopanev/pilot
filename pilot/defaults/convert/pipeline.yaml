@@ -1,0 +1,283 @@
+# Convert pipeline — iOS (Swift/Obj-C) → Dart (Flutter)
+# Phases: analyze → plan → [convert loop per epic] → integrate
+#
+# Phase 1 — Understand:  inventory → ingest → codebook
+# Phase 2 — Plan:        scaffold → create_epics → pick_epic → decompose
+# Phase 3 — Convert:     pick_task → convert → verify → review → fix → merge (loop)
+# Phase 4 — Reflect:     reflect → pick_epic (next epic)
+# Phase 5 — Finalize:    integrate → validate
+version: "0.1"
+starting: inventory
+
+vars:
+  PILOT_DEFAULT_BRANCH: master
+  PILOT_IOS_DIR: ""                           # REQUIRED. iOS project root (relative to project root)
+  PILOT_FLUTTER_DIR: "flutter_app"            # Where to create the Flutter project
+  PILOT_INVENTORY: "data/inventory.json"
+  PILOT_ANALYSIS: "data/analysis.md"
+  PILOT_CODEBOOK: "data/codebook.md"
+  PILOT_CODEBOOK_CHANGELOG: "data/codebook_changelog.md"
+  PILOT_REVIEW_CODEX: "data/review_codex.md"
+  PILOT_REVIEW_GEMINI: "data/review_gemini.md"
+  PILOT_REFINE_ROUND: "1"
+  PILOT_REFINE_MAX_ROUNDS: "3"
+
+pre_pipeline: |
+  set -euo pipefail
+
+  if [ -z "${PILOT_IOS_DIR:-}" ]; then
+    echo "PILOT_IOS_DIR is required — set it in pipeline.yaml vars or .env"
+    exit 1
+  fi
+
+  IOS_DIR="$PILOT_CONFIG_DIR/../../$PILOT_IOS_DIR"
+  if [ ! -d "$IOS_DIR" ]; then
+    echo "iOS project not found at $IOS_DIR"
+    exit 1
+  fi
+
+  if ! command -v flutter &>/dev/null; then
+    echo "flutter not found — install Flutter SDK first"
+    exit 1
+  fi
+
+  if ! command -v tk &>/dev/null; then
+    echo "tk not found — install ticket (https://github.com/wedow/ticket)"
+    exit 1
+  fi
+
+  mkdir -p "$PILOT_CONFIG_DIR/data"
+  echo "Pre-pipeline OK"
+
+on_pipeline_success: bash ../scripts/notify.sh
+on_pipeline_failure: bash ../scripts/notify.sh
+
+stages:
+  # ── Phase 1: Understand ──────────────────────────────────────────────
+
+  # Scan iOS project — files, deps, stats
+  inventory:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/inventory.sh}}
+    on_signal:
+      ready: ingest
+      default: __fail__
+
+  # Gemini ingests the whole codebase (huge context window)
+  ingest:
+    prompt: |
+      {{file:prompts/ingest.md}}
+    runner:
+      executor: gemini
+      model: gemini-3.1-pro-preview
+    fallback_runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: codebook
+      default: __fail__
+
+  # Create the conversion reference document
+  codebook:
+    prompt: |
+      {{file:prompts/codebook.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: scaffold
+      default: __fail__
+
+  # ── Phase 2: Plan ────────────────────────────────────────────────────
+
+  # Create Flutter project skeleton
+  scaffold:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/scaffold.sh}}
+    on_signal:
+      ready: create_epics
+      default: __fail__
+
+  # Create epic tickets in tk from analysis
+  create_epics:
+    prompt: |
+      {{file:prompts/create_epics.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: pick_epic
+      default: __fail__
+
+  # Find next epic without tasks
+  pick_epic:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/pick_epic.sh}}
+    on_signal:
+      ready: decompose            # epic needs tasks
+      completed: integrate        # all epics done → finalize
+      default: __fail__
+
+  # Break one epic into tasks
+  decompose:
+    prompt: |
+      {{file:prompts/decompose.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: pick_task
+      default: __fail__
+
+  # ── Phase 3: Convert (per-task loop) ─────────────────────────────────
+
+  # Pick next ready task in current epic
+  pick_task:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/pick_task.sh}}
+    on_signal:
+      ready: convert              # task found → convert it
+      epic_done: reflect          # epic tasks done → reflect
+      default: __fail__
+
+  # Convert one module (codex fast, opus for hard ones)
+  convert:
+    prompt: |
+      {{file:prompts/convert.md}}
+    runner:
+      executor: codex
+      model: gpt-5.4
+    fallback_runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      failed: __fail__
+      default: verify             # always verify
+
+  # Automated checks — flutter analyze, dart format
+  verify:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/verify.sh}}
+    on_signal:
+      approved: review_codex      # checks pass → cross-model review
+      rejected: fix               # checks fail → fix
+      failed: __fail__
+      default: review_codex
+
+  # Cross-review: Codex checks the conversion
+  review_codex:
+    pre_step: |
+      echo "PILOT_REVIEW_OUTPUT=data/review_codex.md" >> "$PILOT_CONFIG_DIR/vars"
+    prompt: |
+      {{file:prompts/review.md}}
+    runner:
+      executor: codex
+      model: gpt-5.4
+    on_signal:
+      default: review_gemini
+
+  # Cross-review: Gemini checks the conversion
+  review_gemini:
+    pre_step: |
+      echo "PILOT_REVIEW_OUTPUT=data/review_gemini.md" >> "$PILOT_CONFIG_DIR/vars"
+    prompt: |
+      {{file:prompts/review.md}}
+    runner:
+      executor: gemini
+      model: gemini-3.1-pro-preview
+    on_signal:
+      default: refine
+
+  # Adjudicate reviews — opus decides
+  refine:
+    prompt: |
+      {{file:prompts/refine.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      approved: merge             # conversion good → merge
+      rejected: fix               # issues found → fix
+      stuck: escalate             # contradictions → escalate
+      default: __fail__
+
+  # Fix reported issues
+  fix:
+    prompt: |
+      {{file:prompts/fix.md}}
+    runner:
+      executor: claude-code
+      model: sonnet
+    on_signal:
+      stuck: escalate
+      failed: __fail__
+      default: verify             # always back through verify gate
+
+  # Squash merge, close task
+  merge:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/merge.sh}}
+    on_signal:
+      failed: __fail__
+      default: pick_task          # next task in epic
+
+  # ── Phase 4: Reflect ─────────────────────────────────────────────────
+
+  # Review completed epic, update codebook with learnings
+  reflect:
+    prompt: |
+      {{file:prompts/reflect.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      default: pick_epic          # next epic
+
+  # Resolve stuck fix/review loops
+  escalate:
+    prompt: |
+      {{file:prompts/escalate.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      approve: merge              # override: merge it
+      skip: pick_task             # abandon task, try next
+      failed: __fail__
+      default: __fail__
+
+  # ── Phase 5: Finalize ────────────────────────────────────────────────
+
+  # Wire up navigation, DI, main.dart
+  integrate:
+    prompt: |
+      {{file:prompts/integrate.md}}
+    runner:
+      executor: claude-code
+      model: opus
+    on_signal:
+      completed: validate
+      default: __fail__
+
+  # Full build check
+  validate:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/validate.sh}}
+    on_signal:
+      approved: __succeed__
+      failed: __fail__
+      default: __fail__

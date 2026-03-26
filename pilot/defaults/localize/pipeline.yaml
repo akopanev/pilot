@@ -1,0 +1,76 @@
+# Localize pipeline — translate content list into multiple locales
+# Flow: pick_content → localize → write_output → [next content item]
+#
+# For each content item:
+#   1. pick_content: extract item, create en output (no LLM — just reshape)
+#   2. localize: LLM translates all non-en locales in one shot
+#   3. write_output: split translations into locale subfolders
+version: "0.1"
+starting: pick_content
+
+vars:
+  LOCALES: "en,es,fr,de,it,pt,nl,ja,ko,zh"
+  INPUT_FILE: ""                            # REQUIRED. Path to JSON array of content items
+  OUTPUT_DIR: ""                            # REQUIRED. Base output directory (subfolders per locale)
+  CURRENT_INDEX: "0"
+
+pre_pipeline: |
+  set -euo pipefail
+
+  if [ -z "${INPUT_FILE:-}" ]; then
+    echo "INPUT_FILE is required — set it in pipeline.yaml vars or .pilot/vars"
+    exit 1
+  fi
+
+  if [ ! -f "$INPUT_FILE" ]; then
+    echo "INPUT_FILE not found: $INPUT_FILE"
+    exit 1
+  fi
+
+  if [ -z "${OUTPUT_DIR:-}" ]; then
+    echo "OUTPUT_DIR is required — set it in pipeline.yaml vars or .pilot/vars"
+    exit 1
+  fi
+
+  if ! command -v jq &>/dev/null; then
+    echo "jq not found — install jq first"
+    exit 1
+  fi
+
+  mkdir -p "$PILOT_CONFIG_DIR/data"
+  TOTAL=$(jq 'length' "$INPUT_FILE")
+  echo "Input: $TOTAL items, Locales: $LOCALES"
+
+stages:
+  # Extract next content item, create en output (reshape only)
+  pick_content:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/pick_content.sh}}
+    on_signal:
+      ready: localize
+      completed: __succeed__
+      default: __fail__
+
+  # LLM translates to all non-en locales in one shot
+  localize:
+    prompt: |
+      {{file:prompts/localize.md}}
+    runner:
+      executor: claude-code
+      model: sonnet
+    on_signal:
+      completed: write_output
+      failed: __fail__
+      default: write_output
+
+  # Split translations.json into locale subfolders, advance to next item
+  write_output:
+    runner:
+      executor: shell
+      command: |
+        {{file:scripts/write_output.sh}}
+    on_signal:
+      completed: pick_content
+      default: pick_content
