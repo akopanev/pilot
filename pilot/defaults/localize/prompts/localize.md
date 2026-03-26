@@ -10,7 +10,7 @@ Locales: `{{var:LOCALES}}`
 
 ## Task
 
-Translate the source content into every locale listed above **except `en`** (English is already saved).
+Translate the source content into every locale listed above.
 
 For each target locale, translate:
 - `title`
