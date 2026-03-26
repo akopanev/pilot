@@ -12,44 +12,18 @@ starting: pick_content
 
 vars:
   LOCALES: "es,fr,de,it,pt,nl,ja,ko,zh"
-  INPUT_FILE: ""                            # REQUIRED. Path to JSON array of content items
-  OUTPUT_DIR: ""                            # REQUIRED. Base output directory (subfolders per locale)
+  INPUT_FILE: ""                            # REQUIRED. Relative to project root
+  OUTPUT_DIR: ""                            # REQUIRED. Relative to project root
   CURRENT_INDEX: "0"
 
 pre_pipeline: |
   set -euo pipefail
-
-  if [ -z "${INPUT_FILE:-}" ]; then
-    echo "INPUT_FILE is required — set it in pipeline.yaml vars"
-    exit 1
-  fi
-
-  if [ -z "${OUTPUT_DIR:-}" ]; then
-    echo "OUTPUT_DIR is required — set it in pipeline.yaml vars"
-    exit 1
-  fi
-
   if ! command -v jq &>/dev/null; then
     echo "jq not found — install jq first"
     exit 1
   fi
-
-  # Resolve relative paths to absolute (cwd here is config dir, not project root)
-  ABS_INPUT="$(cd "$(dirname "$INPUT_FILE")" && pwd)/$(basename "$INPUT_FILE")"
-  ABS_OUTPUT="$(mkdir -p "$OUTPUT_DIR" && cd "$OUTPUT_DIR" && pwd)"
-
-  if [ ! -f "$ABS_INPUT" ]; then
-    echo "INPUT_FILE not found: $INPUT_FILE (resolved: $ABS_INPUT)"
-    exit 1
-  fi
-
-  # Re-export as absolute so shell stages (different cwd) can find them
-  echo "INPUT_FILE=$ABS_INPUT" >> "$PILOT_CONFIG_DIR/vars"
-  echo "OUTPUT_DIR=$ABS_OUTPUT" >> "$PILOT_CONFIG_DIR/vars"
-
   mkdir -p "$PILOT_CONFIG_DIR/data"
-  TOTAL=$(jq 'length' "$ABS_INPUT")
-  echo "Input: $TOTAL items, Locales: en (source), $LOCALES"
+  echo "Pre-pipeline OK"
 
 stages:
   # Extract next content item, create en/{id}.json (reshape only)

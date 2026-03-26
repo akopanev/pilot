@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Paths are relative to project root (shell stages run from there)
 INPUT_FILE="${INPUT_FILE:?INPUT_FILE is required — set it in pipeline.yaml vars}"
 OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required — set it in pipeline.yaml vars}"
 CURRENT_INDEX="${CURRENT_INDEX:-0}"
 
 if [ ! -f "$INPUT_FILE" ]; then
-  echo "INPUT_FILE not found: $INPUT_FILE"
+  echo "INPUT_FILE not found: $INPUT_FILE (cwd: $(pwd))"
   exit 1
 fi
 
-mkdir -p "${PILOT_CONFIG_DIR}/data"
+mkdir -p "${PILOT_CONFIG_DIR}/data" "$OUTPUT_DIR"
 
 TOTAL=$(jq 'length' "$INPUT_FILE")
 
