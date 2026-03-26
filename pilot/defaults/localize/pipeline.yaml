@@ -3,8 +3,8 @@
 #
 # For each content item:
 #   1. pick_content: extract item, create en/{id}.json (reshape only)
-#   2. localize: LLM translates all locales, writes data/translations.json
-#   3. save_output: shell distributes translations to {locale}/{id}.json
+#   2. localize: LLM spawns parallel agents (one per locale), each writes {locale}/{id}.json
+#   3. save_output: advance to next content item
 # After all items:
 #   4. merge: combine {id}.json files per locale folder into content.json
 version: "0.1"
@@ -37,19 +37,19 @@ stages:
       completed: merge
       default: __fail__
 
-  # LLM translates to all locales, writes data/translations.json
+  # Spawn parallel agents — one per locale — each writes {locale}/{id}.json
   localize:
     prompt: |
       {{file:prompts/localize.md}}
     runner:
       executor: claude-code
-      model: sonnet
+      model: opus
     on_signal:
       completed: save_output
       failed: __fail__
       default: save_output
 
-  # Distribute translations.json to {locale}/{id}.json files
+  # Advance to next content item
   save_output:
     runner:
       executor: shell

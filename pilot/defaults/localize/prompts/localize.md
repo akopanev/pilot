@@ -1,7 +1,8 @@
 # Protocol: Localize Content
 
-Locales: `{{var:LOCALES}}`
 Item ID: `{{var:CURRENT_ID}}`
+Output dir: `{{var:OUTPUT_DIR}}`
+Locales: `{{var:LOCALES}}`
 
 ## Source Content (English)
 
@@ -11,53 +12,38 @@ Item ID: `{{var:CURRENT_ID}}`
 
 ## Task
 
-Translate the source content into every locale listed above.
+Translate this content into EVERY locale listed above. **Launch one Agent per locale — ALL agents in a single message — so they run in parallel.**
 
-For each target locale, translate:
-- `title`
-- `card_title`
-- `article_markdown` — preserve all Markdown formatting exactly: headings (`##`), bullet points (`*`), bold (`**`), links
+Each agent receives:
+- The source content (copy the full JSON above into the agent prompt)
+- The target locale
+- The output file path: `{{var:OUTPUT_DIR}}/{locale}/{{var:CURRENT_ID}}.json`
 
-Copy unchanged:
-- `grounding_sources` → `data.sources` (the array of URLs, unchanged)
+Each agent must:
+1. Translate `title`, `card_title`, and `article_markdown` into the target locale
+2. Copy unchanged: `id` → `canonicalId`, `image_url` → `imageUrl`, `grounding_sources` → `sources`
+3. Create the locale directory if needed
+4. Write the output JSON file
 
-Do NOT translate:
-- URLs
-- Proper nouns, brand names, or technical terms commonly kept in English (e.g. NEAT, HIIT, Non-Exercise Activity Thermogenesis)
-
-The translation must read naturally in the target language — not word-for-word. Keep the same tone, style, and paragraph structure.
-
-## Output
-
-Write a single JSON file to:
-
-```
-{{var:PILOT_CONFIG_DIR}}/data/translations.json
-```
-
-The file must be a JSON object keyed by locale code. Each value uses this structure:
+## Output Format (each agent writes one file)
 
 ```json
 {
-  "es": {
-    "type": "article",
-    "locale": "es",
-    "canonicalId": "{{var:CURRENT_ID}}",
-    "meta": { "status": "published" },
-    "data": {
-      "title": "<translated title>",
-      "card_title": "<translated card_title>",
-      "markdown": "<translated article_markdown>",
-      "imageUrl": "<source image_url unchanged>",
-      "sources": ["<source grounding_sources array unchanged>"]
-    }
-  },
-  "fr": { ... },
-  "de": { ... }
+  "type": "article",
+  "locale": "<locale code>",
+  "canonicalId": "<source id unchanged>",
+  "meta": { "status": "published" },
+  "data": {
+    "title": "<translated title>",
+    "card_title": "<translated card_title>",
+    "markdown": "<translated article_markdown>",
+    "imageUrl": "<source image_url unchanged>",
+    "sources": ["<source grounding_sources array unchanged>"]
+  }
 }
 ```
 
-## JSON Escaping (CRITICAL)
+## JSON Escaping (CRITICAL — include this in every agent prompt)
 
 The `markdown` field is a JSON string containing Markdown. It MUST be properly escaped:
 
@@ -68,21 +54,20 @@ The `markdown` field is a JSON string containing Markdown. It MUST be properly e
 
 Do NOT use literal newlines inside JSON string values. Every line break in the markdown must be `\n` in the JSON string.
 
-Example of a correct `markdown` value:
-```
-"The belief that real weight loss requires punishing gym sessions is completely false.\n\n## The Hidden Power\n\nHere is what is actually happening."
-```
+## Translation Rules (include in every agent prompt)
 
-## Rules
-
-- Include ALL locales from the list — do NOT skip any
-- `canonicalId`, `imageUrl`, and `sources` are copied unchanged from the source
-- `type` is always `"article"`
-- `meta.status` is always `"published"`
+- Do NOT translate URLs, proper nouns, brand names, or technical terms commonly kept in English (e.g. NEAT, HIIT, Non-Exercise Activity Thermogenesis)
+- The translation must read naturally in the target language — not word-for-word
+- Keep the same tone, style, and paragraph structure as the original
+- Preserve all Markdown formatting: headings (`##`), bullet points (`*`), bold (`**`), links
+- `type` is always `"article"`, `meta.status` is always `"published"`
 - Output valid JSON — no trailing commas, no comments
 
-## Signals
+## Execution
 
-- `<signal:update>progress</signal:update>` — progress updates
-- `<signal:completed>done</signal:completed>` — when the file is written
-- `<signal:failed>reason</signal:failed>` — if translation cannot be completed
+1. Split the LOCALES string by comma
+2. Launch ALL locale agents in a **single message** using the Agent tool (this makes them run in parallel)
+3. Wait for all agents to complete
+4. Emit: `<signal:completed>done</signal:completed>`
+
+Do NOT process locales sequentially. All agents MUST be launched in one batch.
