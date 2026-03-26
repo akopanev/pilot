@@ -20,17 +20,12 @@ pre_pipeline: |
   set -euo pipefail
 
   if [ -z "${INPUT_FILE:-}" ]; then
-    echo "INPUT_FILE is required — set it in pipeline.yaml vars or .pilot/vars"
-    exit 1
-  fi
-
-  if [ ! -f "$INPUT_FILE" ]; then
-    echo "INPUT_FILE not found: $INPUT_FILE"
+    echo "INPUT_FILE is required — set it in pipeline.yaml vars"
     exit 1
   fi
 
   if [ -z "${OUTPUT_DIR:-}" ]; then
-    echo "OUTPUT_DIR is required — set it in pipeline.yaml vars or .pilot/vars"
+    echo "OUTPUT_DIR is required — set it in pipeline.yaml vars"
     exit 1
   fi
 
@@ -39,8 +34,21 @@ pre_pipeline: |
     exit 1
   fi
 
+  # Resolve relative paths to absolute (cwd here is config dir, not project root)
+  ABS_INPUT="$(cd "$(dirname "$INPUT_FILE")" && pwd)/$(basename "$INPUT_FILE")"
+  ABS_OUTPUT="$(mkdir -p "$OUTPUT_DIR" && cd "$OUTPUT_DIR" && pwd)"
+
+  if [ ! -f "$ABS_INPUT" ]; then
+    echo "INPUT_FILE not found: $INPUT_FILE (resolved: $ABS_INPUT)"
+    exit 1
+  fi
+
+  # Re-export as absolute so shell stages (different cwd) can find them
+  echo "INPUT_FILE=$ABS_INPUT" >> "$PILOT_CONFIG_DIR/vars"
+  echo "OUTPUT_DIR=$ABS_OUTPUT" >> "$PILOT_CONFIG_DIR/vars"
+
   mkdir -p "$PILOT_CONFIG_DIR/data"
-  TOTAL=$(jq 'length' "$INPUT_FILE")
+  TOTAL=$(jq 'length' "$ABS_INPUT")
   echo "Input: $TOTAL items, Locales: en (source), $LOCALES"
 
 stages:
