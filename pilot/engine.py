@@ -99,6 +99,9 @@ class PipelineEngine:
         # Load .env (secrets) before anything
         self._load_env_file()
 
+        # Sync config vars so pre_pipeline can use them
+        self._sync_env()
+
         # Pipeline pre_pipeline
         if self.config.pre_pipeline:
             if not self._run_step("pre_pipeline", self.config.pre_pipeline, show_output=True):

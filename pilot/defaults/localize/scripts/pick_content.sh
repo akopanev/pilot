@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INPUT_FILE="${INPUT_FILE:?INPUT_FILE not set}"
-OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR not set}"
+INPUT_FILE="${INPUT_FILE:?INPUT_FILE is required — set it in pipeline.yaml vars}"
+OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required — set it in pipeline.yaml vars}"
 CURRENT_INDEX="${CURRENT_INDEX:-0}"
+
+if [ ! -f "$INPUT_FILE" ]; then
+  echo "INPUT_FILE not found: $INPUT_FILE"
+  exit 1
+fi
+
+mkdir -p "${PILOT_CONFIG_DIR}/data"
 
 TOTAL=$(jq 'length' "$INPUT_FILE")
 
