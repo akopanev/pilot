@@ -19,27 +19,27 @@ stages:
       mkdir -p "$PILOT_CONFIG_DIR/runs"
       ROUND_DIR=$(mktemp -d "$PILOT_CONFIG_DIR/runs/$(date +%Y%m%d-%H%M%S)-XXXX")
       echo "<signal:var key=ROUND_DIR>$ROUND_DIR</signal:var>"
-      echo "<signal:var key=OUTPUT_OPUS>$ROUND_DIR/opus.md</signal:var>"
+      echo "<signal:var key=OUTPUT_GLM5>$ROUND_DIR/glm5.md</signal:var>"
       echo "<signal:var key=OUTPUT_GPT5>$ROUND_DIR/gpt5.md</signal:var>"
       echo "<signal:var key=OUTPUT_GEMINI>$ROUND_DIR/gemini.md</signal:var>"
     prompt: |
       {{file:prompts/spar.md}}
     runners:
-      - executor: claude-code
-        model: opus
+      - executor: opencode
+        model: zai-coding-plan/glm-5.1
         vars:
-          OUTPUT: "{{var:OUTPUT_OPUS}}"
+          OUTPUT: "{{var:OUTPUT_GLM5}}"
       - executor: codex
         model: gpt-5.5
         vars:
           OUTPUT: "{{var:OUTPUT_GPT5}}"
       - executor: gemini
-        model: gemini-2.5-pro
+        model: gemini-3.1-pro-preview
         vars:
           OUTPUT: "{{var:OUTPUT_GEMINI}}"
     parallel: true
-    min_success: 2
-    per_runner_timeout: 600
+    min_success: 1
+    per_runner_timeout: 1800
     on_signal:
       default: synthesize
 
