@@ -1,9 +1,10 @@
-# Ensemble pipeline — three sparring partners answer the same question in parallel
+# Ensemble pipeline — a panel of independent models answers the same question in parallel
 #
 # Run directly:
 #   pilot run .pilot/ensemble/pipeline.yaml --var QUESTION="your question"
 #
-# Or install as a Claude Code skill, then use /ensemble in a Claude session:
+# Or install as a Claude Code skill, then /ensemble fires when Claude
+# decides it needs outside perspective:
 #   pilot init-skill ensemble
 #
 # Output: synthesized.md inside .pilot/ensemble/runs/<timestamp>-XXXX/
@@ -11,67 +12,94 @@ version: "0.1"
 starting: spar
 
 # Skill template — `pilot init-skill ensemble` writes this verbatim to
-# .claude/skills/ensemble/SKILL.md so /ensemble works in Claude Code.
-# The skill's bash injection wraps the user's bare question with the
-# sparring framing before passing to pilot, so the pipeline itself
-# stays generic ("ask N models the same thing in parallel and save").
+# .claude/skills/ensemble/SKILL.md. The skill instructs Claude (the
+# caller) to construct the panel prompt itself, fitted to the
+# situation, then run pilot via its Bash tool. The pipeline stays
+# generic — "ask N models the same thing in parallel and save".
 skill: |
   ---
   name: ensemble
   description: |
-    Spar with three independent models on a strategic, architectural, or product
-    question. Surfaces dissent rather than consensus, returns three independent
-    verdicts (COMMIT / DRAW / INSUFFICIENT). Use when the user wants a panel's
-    view on a hard call, asks "what would other models say about X?", or asks
-    for a second / third opinion on a non-trivial decision.
-  allowed-tools: Bash(pilot-docker run *)
+    A panel of independent models attacks the same decision in parallel —
+    counsel without consensus, scrutiny without sycophancy. Each returns
+    reasoning, verdict, and the strongest counter to whatever's being
+    leaned toward. For decisions that can't be confirmed by facts:
+    strategic, architectural, organizational, career, product. The panel
+    exists to disagree. If a fact lookup or a code change would resolve
+    the question, this is the wrong tool.
+  allowed-tools: Bash(pilot-docker run *) Bash(cat *) Bash(ls *)
+  effort: high
   ---
 
-  The user asked: $ARGUMENTS
+  You're consulting an independent panel — outside perspective on a
+  non-trivial call you're working through. The panel does not see
+  this conversation, your codebase, or your prior reasoning.
+  Everything they need to give a useful answer has to be in the prompt
+  you build.
 
-  Three independent models — none have seen this conversation — answered the
-  same question in parallel. Their takes:
+  # Build the prompt
 
-  ```!
-  PROMPT=$(cat <<'PROMPT_END'
-  You are a rigorous sparring partner. Tough love, no cheerleading, no filler.
-  You are one of multiple sparring partners answering this question in parallel.
+  The prompt is the artifact. Treat it as the brief you'd give a
+  senior outsider you trusted: complete enough to answer without
+  follow-up, sharp enough to provoke real thinking.
 
-  Reason in depth. Show the chain. Make load-bearing assumptions explicit.
-  Three honest verdict types are allowed:
-  - COMMIT       — you have enough to take a side; take it.
-  - DRAW         — answer is conditional; state which conditions tip each side.
-  - INSUFFICIENT — name the 1–3 specific facts that would change your answer.
+  Cover:
 
-  Constraints:
-  - Total response under ~500 words.
-  - Do not refer to yourself, your name, or your model.
-  - Reasoning artifact only — no code, configs, or specs unless explicitly asked.
-  - Mark cited facts (R) for confident recall or (G) for guess.
-  - Surface the strongest counter to your verdict and the asker's likely blind spot.
-  - End with what you'd do if forced to commit today, even under DRAW/INSUFFICIENT.
+  - **The problem.** What's actually being decided. State it precisely.
+  - **Progress so far.** What you've tried, what you've ruled out,
+    what you currently think and why. Make your leaning explicit so
+    the panel can attack it.
+  - **The stuck point.** Where your reasoning runs out, what data
+    you don't have, what you genuinely cannot decide alone.
+  - **Files in the repo (use them).** The panel runs as full agents —
+    claude-code, codex, gemini — each with file-read tools and your
+    working directory inherited as their cwd. Any path you reference
+    resolves the same way it does for you. Files matter not just for
+    the *answer* but for the *context the panel needs to answer well*:
+    the code the question is about, strategy or architecture docs,
+    prior decisions, design notes, planning artifacts, README files.
+    **Instruct the panel to read what's relevant** — be concrete about
+    file paths, line ranges, grep patterns. Don't paste large snippets
+    into the prompt when you can point at the source; pasting wastes
+    tokens the panel could spend reasoning.
+  - **Framing.** Pick what fits:
+     - Sparring with verdicts (COMMIT / DRAW / INSUFFICIENT) for
+       binary or near-binary calls with stakes.
+     - Multiple-lens roleplay (assign each panelist a distinct role —
+       skeptic, devil's advocate, operator, contrarian) for relational,
+       organizational, or judgment calls.
+     - Red-team for plans about to execute.
+     - Whatever else suits the situation. These are starting points,
+       not a menu.
+  - **Demands.** Depth, dissent, the strongest counter, the blind
+    spot you're least likely to see. Forbid sycophancy. Mark cited
+    facts `(R)` for confident recall, `(G)` for guess. Cap each
+    panelist at ~500 words.
 
-  Format (use these exact headings):
-  ## Read           one paragraph reframing what's actually being asked
-  ## Reasoning      the chain of thought
-  ## Verdict        COMMIT | DRAW | INSUFFICIENT, plus the verdict itself
-  ## Strongest counter
-  ## Blind spot
-  ## If forced to commit today
+  # Run the panel
 
-  Question:
-  $1
-  PROMPT_END
-  )
-  pilot-docker run .pilot/ensemble/pipeline.yaml --var "QUESTION=$PROMPT" >&2
-  cat "$(ls -td .pilot/ensemble/runs/* | head -1)/synthesized.md"
-  ```
+  Mechanical contract — invoke verbatim, substituting your built
+  prompt for the QUESTION value:
 
-  Read the three takes above and surface to the user:
-  1. Where the panel agrees (rare — call it out explicitly when it happens)
-  2. Where they disagree, and which disagreement most matters for the user's
-     actual decision
-  3. Whether the panel collectively missed something the user might care about
+      pilot-docker run .pilot/ensemble/pipeline.yaml --var "QUESTION=<your prompt>" >&2
+      cat "$(ls -td .pilot/ensemble/runs/* | head -1)/synthesized.md"
+
+  The cat'd output is the panel's combined takes, separated by headers.
+
+  # Use the result
+
+  You called the panel because you needed perspective. Now you have
+  takes from outside your context. Read them, then:
+
+  1. Notice where the panel converges — rare; worth flagging.
+  2. Notice where they diverge, and identify which divergence most
+     matters for the specific decision you're working through.
+  3. Notice what the panel collectively missed because they didn't
+     see your conversation, your codebase, or your actual constraints.
+
+  Do not soften their verdicts when integrating into your reasoning.
+  Do not flatten dissent into consensus through restatement. The
+  disagreement is the signal — the entire point of running this.
 
 pre_pipeline: |
   if [ -z "${QUESTION:-}" ]; then
