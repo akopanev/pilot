@@ -1,11 +1,44 @@
-# Ensemble pipeline — sparring partners (3 independent takes, no consensus)
+# Ensemble pipeline — three sparring partners answer the same question in parallel
 #
-# Run:
+# Run directly:
 #   pilot run .pilot/ensemble/pipeline.yaml --var QUESTION="your question"
+#
+# Or install as a Claude Code skill, then use /ensemble in a Claude session:
+#   pilot init-skill ensemble
 #
 # Output: synthesized.md inside .pilot/ensemble/runs/<timestamp>-XXXX/
 version: "0.1"
 starting: spar
+
+# Skill template — `pilot init-skill ensemble` writes this verbatim to
+# .claude/skills/ensemble/SKILL.md so /ensemble works in Claude Code.
+skill: |
+  ---
+  name: ensemble
+  description: |
+    Spar with three independent models on a strategic, architectural, or product
+    question. Surfaces dissent rather than consensus, returns three independent
+    verdicts (COMMIT / DRAW / INSUFFICIENT). Use when the user wants a panel's
+    view on a hard call, asks "what would other models say about X?", or asks
+    for a second / third opinion on a non-trivial decision.
+  allowed-tools: Bash(pilot-docker run *)
+  ---
+
+  The user asked: $ARGUMENTS
+
+  Three independent models — none have seen this conversation — answered the
+  same question in parallel. Their takes:
+
+  ```!
+  pilot-docker run .pilot/ensemble/pipeline.yaml --var "QUESTION=$1" >&2
+  cat "$(ls -td .pilot/ensemble/runs/* | head -1)/synthesized.md"
+  ```
+
+  Read the three takes above and surface to the user:
+  1. Where the panel agrees (rare — call it out explicitly when it happens)
+  2. Where they disagree, and which disagreement most matters for the user's
+     actual decision
+  3. Whether the panel collectively missed something the user might care about
 
 pre_pipeline: |
   if [ -z "${QUESTION:-}" ]; then

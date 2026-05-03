@@ -251,6 +251,104 @@ def cmd_init(args) -> None:
     )
 
 
+def _read_skill_field(pipeline_yaml_path: Path) -> str | None:
+    """Return the top-level `skill:` string from a pipeline.yaml, or None.
+
+    Used by `pilot init-skill` to materialise a Claude Code skill from
+    the pipeline's bundled SKILL.md template.
+    """
+    import yaml
+    try:
+        with open(pipeline_yaml_path) as f:
+            raw = yaml.safe_load(f)
+    except (OSError, yaml.YAMLError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    skill = raw.get("skill")
+    if isinstance(skill, str) and skill.strip():
+        return skill
+    return None
+
+
+def cmd_init_skill(args) -> None:
+    """Install a pipeline's bundled SKILL.md template into .claude/skills/<name>/.
+
+    Reads the top-level `skill:` field from `.pilot/<name>/pipeline.yaml`
+    and writes it verbatim to `.claude/skills/<name>/SKILL.md`. The
+    pipeline author owns the SKILL.md content; pilot just copies.
+    """
+    display = Display()
+    cwd = Path.cwd()
+    pilot_dir = cwd / ".pilot"
+
+    # No args: list pipelines that have a skill template
+    if not args.name:
+        display.console.print("[bold]Pipelines with a skill template:[/]\n")
+        if not pilot_dir.is_dir():
+            display.console.print(
+                "  [dim](no .pilot/ directory in this project — run "
+                "`pilot init <name>` first)[/]"
+            )
+            return
+        any_listed = False
+        for sub in sorted(pilot_dir.iterdir()):
+            if not sub.is_dir():
+                continue
+            yaml_path = sub / "pipeline.yaml"
+            if not yaml_path.is_file():
+                continue
+            has_skill = _read_skill_field(yaml_path) is not None
+            marker = "[green]✓[/]" if has_skill else "[dim]·[/]"
+            note = "" if has_skill else "[dim] (no skill: block)[/]"
+            display.console.print(f"  {marker} [stage]{sub.name}[/]{note}")
+            any_listed = True
+        if not any_listed:
+            display.console.print("  [dim](no pipelines installed — run `pilot init <name>` first)[/]")
+        display.console.print()
+        display.console.print("[dim]Usage:[/]  pilot init-skill <name>")
+        return
+
+    name = args.name
+    pipeline_yaml = pilot_dir / name / "pipeline.yaml"
+    if not pipeline_yaml.is_file():
+        display.error(
+            f"No pipeline at .pilot/{name}/pipeline.yaml — "
+            f"run `pilot init {name}` first."
+        )
+        sys.exit(1)
+
+    skill_content = _read_skill_field(pipeline_yaml)
+    if skill_content is None:
+        display.error(
+            f"Pipeline `{name}` has no `skill:` block in "
+            f".pilot/{name}/pipeline.yaml — add a top-level `skill: |` "
+            f"string carrying the SKILL.md content first."
+        )
+        sys.exit(1)
+
+    skill_dir = cwd / ".claude" / "skills" / name
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_md = skill_dir / "SKILL.md"
+
+    if skill_md.exists() and not args.force:
+        display.error(
+            f".claude/skills/{name}/SKILL.md already exists — pass --force "
+            f"to overwrite."
+        )
+        sys.exit(1)
+
+    skill_md.write_text(skill_content)
+
+    display.console.print(
+        f"[success]Installed skill[/] [stage]{name}[/]"
+    )
+    display.console.print(f"  [green]+[/] .claude/skills/{name}/SKILL.md")
+    display.console.print(
+        f"\n[dim]Use it in Claude Code:[/]  /{name} \"<your question>\""
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="pilot",
@@ -291,6 +389,16 @@ def main() -> None:
     init_p.add_argument("--force", action="store_true",
                         help="Overwrite existing files without confirmation")
 
+    # pilot init-skill [name] [--force]
+    skill_p = sub.add_parser(
+        "init-skill",
+        help="Install a pipeline's SKILL.md template into .claude/skills/",
+    )
+    skill_p.add_argument("name", nargs="?",
+                         help="Pipeline name (omit to list pipelines with skill templates)")
+    skill_p.add_argument("--force", action="store_true",
+                         help="Overwrite existing .claude/skills/<name>/SKILL.md")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -298,7 +406,13 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        {"run": cmd_run, "validate": cmd_validate, "init": cmd_init, "graph": cmd_graph}[args.command](args)
+        {
+            "run": cmd_run,
+            "validate": cmd_validate,
+            "init": cmd_init,
+            "init-skill": cmd_init_skill,
+            "graph": cmd_graph,
+        }[args.command](args)
     except ConfigError as e:
         print(f"Config error: {e}", file=sys.stderr)
         sys.exit(1)

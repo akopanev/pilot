@@ -264,8 +264,44 @@ pilot validate <pipeline.yaml>         Validate config
 pilot init                             List available pipelines
 pilot init <name> [<name>...]          Install selected pipelines into .pilot/
 pilot init --all [--force]             Install everything (--force to overwrite)
+pilot init-skill                       List installed pipelines that have a skill template
+pilot init-skill <name> [--force]      Copy <pipeline>'s SKILL.md template into
+                                       .claude/skills/<name>/ for use in Claude Code
 pilot graph <pipeline.yaml>            Generate PNG visualization of the pipeline
 ```
+
+### Skills
+
+A pipeline can declare a `skill: |` field at the top of its `pipeline.yaml`. The string is the verbatim contents of a [Claude Code skill](https://code.claude.com/docs/en/skills) — frontmatter + markdown body. `pilot init-skill <name>` writes that string to `.claude/skills/<name>/SKILL.md`, exposing the pipeline as a `/<name>` slash command in Claude Code.
+
+```yaml
+# pipeline.yaml
+version: "0.1"
+starting: spar
+
+skill: |
+  ---
+  name: ensemble
+  description: |
+    Spar with three independent models on a strategic question.
+    Surfaces dissent rather than consensus.
+  allowed-tools: Bash(pilot-docker run *)
+  ---
+
+  The user asked: $ARGUMENTS
+
+  ```!
+  pilot-docker run .pilot/ensemble/pipeline.yaml --var "QUESTION=$1" >&2
+  cat "$(ls -td .pilot/ensemble/runs/* | head -1)/synthesized.md"
+  ```
+
+  [post-output instructions for Claude]
+
+stages:
+  ...
+```
+
+Pilot doesn't transform the skill content — it's copied verbatim. The pipeline author owns the launch incantation, allowed-tools, post-instructions, everything. If a pipeline has no `skill:` field, `pilot init-skill <name>` errors with a hint.
 
 ## Persistence
 
