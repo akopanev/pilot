@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -21,12 +21,20 @@ class Transition:
 @dataclass
 class Stage:
     name: str
-    prompt: str | None                      # AI stages (supports {{file:}})
-    runner: Runner
+    prompt: str | None                          # AI stages (supports {{file:}})
+    runner: Runner | None                        # single-runner stages
     fallback_runner: Runner | None
-    on_signal: dict[str, Transition]        # signal_name -> Transition
-    pre_step: str | None = None             # shell command before executor
-    post_step: str | None = None            # shell command after executor
+    on_signal: dict[str, Transition]            # signal_name -> Transition
+    pre_step: str | None = None                 # shell command before executor
+    post_step: str | None = None                # shell command after executor
+    runners: list[Runner] | None = None         # ensemble stages (parallel runners)
+    parallel: bool = True                       # ensemble: run runners concurrently
+    min_success: int | None = None              # ensemble: K-of-N success threshold
+    per_runner_timeout: int | None = None       # ensemble: per-runner cancel deadline (s)
+
+    @property
+    def is_ensemble(self) -> bool:
+        return self.runners is not None
 
 
 @dataclass

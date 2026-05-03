@@ -52,24 +52,38 @@ def build_graph(config_path: str, output: str | None = None) -> str:
 
     # Stage nodes
     for name, stage in config.stages.items():
-        runner = stage.runner
-        runner_info = (f"{runner.executor}/{runner.model}"
-                       if runner.model else runner.executor)
+        attrs: dict[str, str] = {}
 
-        parts = [name, runner_info]
-        if stage.fallback_runner:
-            fb = stage.fallback_runner
-            fb_info = (f"{fb.executor}/{fb.model}"
-                       if fb.model else fb.executor)
-            parts.append(f"fb: {fb_info}")
+        if stage.runners:
+            mode = "parallel" if stage.parallel else "sequential"
+            parts = [name, f"[ensemble × {len(stage.runners)} ({mode})]"]
+            for r in stage.runners:
+                info = f"{r.executor}/{r.model}" if r.model else r.executor
+                parts.append(f"· {info}")
+            if stage.min_success is not None:
+                parts.append(f"min_success: {stage.min_success}")
+            attrs["fillcolor"] = "#e8d5ff"   # ensemble — purple
+        else:
+            runner = stage.runner
+            runner_info = (
+                f"{runner.executor}/{runner.model}"
+                if runner.model else runner.executor
+            )
+            parts = [name, runner_info]
+            if stage.fallback_runner:
+                fb = stage.fallback_runner
+                fb_info = (
+                    f"{fb.executor}/{fb.model}"
+                    if fb.model else fb.executor
+                )
+                parts.append(f"fb: {fb_info}")
+            if stage.prompt:
+                attrs["fillcolor"] = "#ddeeff"   # AI stages — blue
+            else:
+                attrs["fillcolor"] = "#ddffdd"   # shell stages — green
 
         label = "\n".join(parts)
 
-        attrs: dict[str, str] = {}
-        if stage.prompt:
-            attrs["fillcolor"] = "#ddeeff"   # AI stages — blue
-        else:
-            attrs["fillcolor"] = "#ddffdd"   # shell stages — green
         if name == config.start_stage:
             attrs["penwidth"] = "2"
 

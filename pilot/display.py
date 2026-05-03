@@ -116,17 +116,73 @@ class Display:
         self.console.print(line)
         self._log(f"--- Round {round_num} | {stage_name}  {runner_label} ---")
 
-    def update(self, content: str) -> None:
+    def round_header_ensemble(self, round_num: int, stage_name: str,
+                              runners: list[tuple[str, str | None]]) -> None:
+        """Round divider for ensemble stages (multiple runners in parallel)."""
+        if self._log_dir:
+            with self._lock:
+                if self._round_file:
+                    self._round_file.close()
+                filename = f"{round_num:03d}-{stage_name}-ensemble.txt"
+                self._round_file = open(os.path.join(self._log_dir, filename), "w")
+
+        labels = [f"{ex}/{m}" if m else ex for ex, m in runners]
+        runner_label = f"[ensemble: {', '.join(labels)}]"
+        title = f"Round {round_num} | {stage_name}  {runner_label}"
+        width = self.console.width or 80
+        pad = max(4, width - len(title) - 5)
+        line = Text.assemble(
+            ("─── ", "dim"),
+            (f"Round {round_num} ", "round"),
+            ("| ", "dim"),
+            (stage_name, "stage"),
+            ("  ", ""),
+            (runner_label, "runner"),
+            (" ", ""),
+            ("─" * pad, "dim"),
+        )
+        self.console.print()
+        self.console.print(line)
+        self._log(f"--- {title} ---")
+
+    def ensemble_runner_done(self, source: str, exit_code: int,
+                             elapsed_seconds: int, num_signals: int) -> None:
+        """Per-runner completion line for an ensemble round."""
+        ts = self._timestamp()
+        if exit_code == 0:
+            status = "[success]ok[/]"
+        else:
+            status = f"[error]failed (exit {exit_code})[/]"
+        self.console.print(
+            f"  {ts} \\[{source}] {status} "
+            f"[dim]· {elapsed_seconds}s · {num_signals} signal(s)[/]",
+            highlight=False,
+        )
+        outcome = "ok" if exit_code == 0 else f"failed (exit {exit_code})"
+        self._log(f"[{source}] {outcome} ({elapsed_seconds}s, {num_signals} signals)")
+
+    def update(self, content: str, source: str | None = None) -> None:
         """Display an update signal."""
         ts = self._timestamp()
-        self.console.print(f"  {ts} [signal.update]{content}[/]", highlight=False)
-        self._log(content)
+        prefix = f"\\[{source}] " if source else ""
+        self.console.print(
+            f"  {ts} {prefix}[signal.update]{content}[/]",
+            highlight=False,
+        )
+        log_line = f"[{source}] {content}" if source else content
+        self._log(log_line)
 
-    def domain_signal(self, name: str, content: str) -> None:
+    def domain_signal(self, name: str, content: str,
+                      source: str | None = None) -> None:
         """Display a domain signal (approved, rejected, etc.)."""
         ts = self._timestamp()
-        self.console.print(f"  {ts} [signal.domain]{name}:[/] {content}", highlight=False)
-        self._log(f"<signal:{name}> {content}")
+        prefix = f"\\[{source}] " if source else ""
+        self.console.print(
+            f"  {ts} {prefix}[signal.domain]{name}:[/] {content}",
+            highlight=False,
+        )
+        log_line = f"[{source}] <signal:{name}> {content}" if source else f"<signal:{name}> {content}"
+        self._log(log_line)
 
     def transition(self, from_stage: str, to_stage: str) -> None:
         """Display stage transition."""
@@ -179,14 +235,16 @@ class Display:
         )
         self._log(f"Fallback: {primary} -> {fallback}")
 
-    def executor_output(self, text: str) -> None:
+    def executor_output(self, text: str, source: str | None = None) -> None:
         """Stream executor output — always logged, terminal only in verbose."""
         stripped = text.rstrip()
         if not stripped:
             return
         if self.verbose:
-            self.console.print(f"    [dim]{stripped}[/]")
-        self._log(stripped)
+            prefix = f"\\[{source}] " if source else ""
+            self.console.print(f"    {prefix}[dim]{stripped}[/]")
+        log_line = f"[{source}] {stripped}" if source else stripped
+        self._log(log_line)
 
     def _timestamp(self) -> str:
         now = datetime.now().strftime("%H:%M:%S")
@@ -196,12 +254,36 @@ class Display:
         """Display pipeline stages in dry-run mode."""
         self.console.print("\n[bold]Pipeline stages:[/]\n")
         for name, stage in stages.items():
-            runner_info = f"{stage.runner.executor}/{stage.runner.model}" if stage.runner.model else stage.runner.executor
-            fallback = ""
-            if stage.fallback_runner:
-                fallback = f" [dim](fallback: {stage.fallback_runner.executor}/{stage.fallback_runner.model})[/]"
-
-            self.console.print(f"  [stage]{name}[/]  [runner]{runner_info}[/]{fallback}")
+            if stage.runners:
+                mode = "parallel" if stage.parallel else "sequential"
+                self.console.print(
+                    f"  [stage]{name}[/]  [runner][ensemble × {len(stage.runners)} ({mode})][/]"
+                )
+                for r in stage.runners:
+                    info = f"{r.executor}/{r.model}" if r.model else r.executor
+                    self.console.print(f"    [runner]· {info}[/]")
+                if stage.min_success is not None:
+                    self.console.print(
+                        f"    [dim]min_success: {stage.min_success}/{len(stage.runners)}[/]"
+                    )
+                if stage.per_runner_timeout is not None:
+                    self.console.print(
+                        f"    [dim]per_runner_timeout: {stage.per_runner_timeout}s[/]"
+                    )
+            else:
+                runner_info = (
+                    f"{stage.runner.executor}/{stage.runner.model}"
+                    if stage.runner.model else stage.runner.executor
+                )
+                fallback = ""
+                if stage.fallback_runner:
+                    fallback = (
+                        f" [dim](fallback: {stage.fallback_runner.executor}"
+                        f"/{stage.fallback_runner.model})[/]"
+                    )
+                self.console.print(
+                    f"  [stage]{name}[/]  [runner]{runner_info}[/]{fallback}"
+                )
 
             for sig_name, trans in stage.on_signal.items():
                 dest = trans.to or "[dim]stop[/]"

@@ -43,22 +43,81 @@ def _parse_stage(name: str, data: dict) -> Stage:
     if not isinstance(data, dict):
         raise ConfigError(f"Stage '{name}': must be a mapping")
 
-    # Runner (parse first to know executor type)
     runner_data = data.get("runner")
-    if not runner_data:
-        raise ConfigError(f"Stage '{name}': 'runner' is required")
-    runner = _parse_runner(runner_data, f"Stage '{name}' runner")
+    runners_data = data.get("runners")
 
-    # Prompt — required for AI executors, not needed for shell
-    prompt = data.get("prompt")
-    if runner.executor != "shell" and not prompt:
-        raise ConfigError(f"Stage '{name}': 'prompt' is required for {runner.executor}")
+    if runner_data and runners_data:
+        raise ConfigError(
+            f"Stage '{name}': cannot have both 'runner' and 'runners' — pick one"
+        )
+    if not runner_data and not runners_data:
+        raise ConfigError(f"Stage '{name}': must specify 'runner' or 'runners'")
 
-    # Fallback runner (optional)
-    fallback_data = data.get("fallback_runner")
-    fallback_runner = _parse_runner(fallback_data, f"Stage '{name}' fallback_runner") if fallback_data else None
+    runner: Runner | None = None
+    runners: list[Runner] | None = None
+    fallback_runner: Runner | None = None
+    is_ensemble = runners_data is not None
 
-    # Transitions
+    if is_ensemble:
+        if not isinstance(runners_data, list) or not runners_data:
+            raise ConfigError(
+                f"Stage '{name}': 'runners' must be a non-empty list"
+            )
+        runners = []
+        for i, rd in enumerate(runners_data):
+            r = _parse_runner(rd, f"Stage '{name}' runners[{i}]")
+            if r.executor == "shell":
+                raise ConfigError(
+                    f"Stage '{name}' runners[{i}]: 'shell' executor is not allowed "
+                    f"in ensemble runners"
+                )
+            runners.append(r)
+
+        prompt = data.get("prompt")
+        if not prompt:
+            raise ConfigError(
+                f"Stage '{name}': 'prompt' is required for ensemble stages"
+            )
+
+        if data.get("fallback_runner"):
+            raise ConfigError(
+                f"Stage '{name}': 'fallback_runner' is not supported on ensemble stages"
+            )
+    else:
+        runner = _parse_runner(runner_data, f"Stage '{name}' runner")
+        prompt = data.get("prompt")
+        if runner.executor != "shell" and not prompt:
+            raise ConfigError(
+                f"Stage '{name}': 'prompt' is required for {runner.executor}"
+            )
+        fallback_data = data.get("fallback_runner")
+        fallback_runner = (
+            _parse_runner(fallback_data, f"Stage '{name}' fallback_runner")
+            if fallback_data else None
+        )
+
+    parallel = bool(data.get("parallel", True))
+    min_success = data.get("min_success")
+    per_runner_timeout = data.get("per_runner_timeout")
+
+    if is_ensemble:
+        if min_success is not None:
+            if not isinstance(min_success, int) or min_success < 1 or min_success > len(runners):
+                raise ConfigError(
+                    f"Stage '{name}': 'min_success' must be an int in 1..{len(runners)}"
+                )
+        if per_runner_timeout is not None:
+            if not isinstance(per_runner_timeout, int) or per_runner_timeout < 1:
+                raise ConfigError(
+                    f"Stage '{name}': 'per_runner_timeout' must be a positive int (seconds)"
+                )
+    else:
+        if min_success is not None or per_runner_timeout is not None or "parallel" in data:
+            raise ConfigError(
+                f"Stage '{name}': 'parallel'/'min_success'/'per_runner_timeout' "
+                f"only apply to ensemble stages"
+            )
+
     on_signal_data = data.get("on_signal", {})
     if not isinstance(on_signal_data, dict):
         raise ConfigError(f"Stage '{name}': 'on_signal' must be a mapping")
@@ -69,6 +128,14 @@ def _parse_stage(name: str, data: dict) -> Stage:
 
     if "default" not in on_signal:
         raise ConfigError(f"Stage '{name}': 'on_signal' must include a 'default' entry")
+
+    if is_ensemble:
+        non_default = sorted(set(on_signal.keys()) - {"default"})
+        if non_default:
+            raise ConfigError(
+                f"Stage '{name}': ensemble stages support only 'default' in 'on_signal' "
+                f"(got: {non_default}); route via the next stage's signals instead"
+            )
 
     pre_step = data.get("pre_step")
     post_step = data.get("post_step")
@@ -81,6 +148,10 @@ def _parse_stage(name: str, data: dict) -> Stage:
         on_signal=on_signal,
         pre_step=pre_step,
         post_step=post_step,
+        runners=runners,
+        parallel=parallel,
+        min_success=min_success,
+        per_runner_timeout=per_runner_timeout,
     )
 
 

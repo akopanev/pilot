@@ -8,14 +8,19 @@ Config-driven state machine for AI agent workflows. Define stages, signals, and 
 # Install (Python 3.11+)
 curl -sSL https://raw.githubusercontent.com/akopanev/pilot/master/install.sh | bash
 
-# Scaffold .pilot/ in your project
+# List available pipelines
 cd your-project && pilot init
 
+# Scaffold one or more into .pilot/
+pilot init dev
+pilot init dev plan          # multiple
+pilot init --all             # everything
+
 # Run locally
-pilot run .pilot/pipeline.yaml
+pilot run .pilot/dev/pipeline.yaml
 
 # Run in Docker (claude-code, codex, gemini, opencode pre-installed)
-pilot-docker run .pilot/pipeline.yaml
+pilot-docker run .pilot/dev/pipeline.yaml
 ```
 
 Installs `pilot` and `pilot-docker` to `~/.local/bin/`.
@@ -103,6 +108,35 @@ Each stage supports optional `pre_step` and `post_step` — shell commands that 
 
 Each stage has a `runner` and optional `fallback_runner`. Primary retries twice, then fallback retries twice. Three consecutive round failures stop the pipeline.
 
+### Ensemble stages
+
+Run the same prompt across N runners in parallel — useful for brainstorm, architecture, multi-model second opinions:
+
+```yaml
+brainstorm:
+  prompt: "{{file:question.md}}"
+  runners:
+    - { executor: claude-code, model: opus }
+    - { executor: codex, model: gpt-5 }
+    - { executor: gemini, model: gemini-2.5-pro }
+  parallel: true                  # default; set false to serialize
+  min_success: 2                  # round passes if K of N succeed (default: all)
+  per_runner_timeout: 600         # seconds; default: none
+  on_signal:
+    default: synthesize           # ensemble stages only support 'default'
+
+synthesize:
+  runner:
+    executor: shell
+    command: bash scripts/synthesize.sh
+  on_signal:
+    default: __succeed__
+```
+
+Per-runner outputs land at `$PILOT_ENSEMBLE_DIR/<executor>-<model>.txt` (and `.signals.json`). The synthesize stage reads them and produces the final artifact. `PILOT_ENSEMBLE_SUCCESSES` / `PILOT_ENSEMBLE_FAILURES` are exported for post-processing.
+
+Constraints: ensemble stages require `prompt` (no `shell` executor in `runners`), can't define `fallback_runner`, and may only have `default` in `on_signal` — route via the next stage's signals.
+
 ### Signals
 
 Agents and scripts emit signals as XML tags in their output:
@@ -148,7 +182,7 @@ Set from three places: `vars:` in config, `<signal:var>` from agents, or direct 
 
 ## Default Pipelines
 
-`pilot init` scaffolds four pipelines into `.pilot/`:
+`pilot init` (no args) lists what's available and exits. Pass one or more pipeline names to install them, or `--all` for everything. `--force` overwrites without confirmation; otherwise existing files prompt before overwrite (and skip in non-interactive shells).
 
 | Pipeline | Path | Description |
 |----------|------|-------------|
@@ -156,6 +190,8 @@ Set from three places: `vars:` in config, `<signal:var>` from agents, or direct 
 | **prd** | `prd/pipeline.yaml` | Gather competitor data → research → analyze → baseline → generate PRD |
 | **design** | `design/pipeline.yaml` | Screens → theme → per-screen detail |
 | **plan** | `plan/pipeline.yaml` | Create epics → pick epic → decompose into tasks (loop) |
+| **convert** | `convert/pipeline.yaml` | iOS (Swift/Obj-C) → Dart (Flutter) source conversion |
+| **localize** | `localize/pipeline.yaml` | Translate content into multiple locales |
 
 ### Dev Pipeline
 
@@ -210,7 +246,9 @@ pilot run <pipeline.yaml>              Run the pipeline
 pilot run <pipeline.yaml> --dry-run    Show stages without executing
 pilot run <pipeline.yaml> --verbose    Stream executor output to terminal
 pilot validate <pipeline.yaml>         Validate config
-pilot init                             Scaffold .pilot/ with default pipelines
+pilot init                             List available pipelines
+pilot init <name> [<name>...]          Install selected pipelines into .pilot/
+pilot init --all [--force]             Install everything (--force to overwrite)
 pilot graph <pipeline.yaml>            Generate PNG visualization of the pipeline
 ```
 

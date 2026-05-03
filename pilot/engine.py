@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from pilot.display import Display
 from pilot.executors import ExecutorPool
-from pilot.models import PipelineConfig, PipelineState, Stage
+from pilot.executors.result import ExecutorResult
+from pilot.models import PipelineConfig, PipelineState, Runner, Stage
 from rich.markup import escape as rich_escape
 
-from pilot.signals import BUILTIN_SIGNALS
+from pilot.signals import BUILTIN_SIGNALS, Signal
 from pilot.state import clear_state, read_state, write_state
 from pilot.templates import TemplateError, resolve_templates
 from pilot.vars import clear_vars, export_vars, write_var
@@ -32,6 +36,7 @@ class PipelineEngine:
         vars_path: str,
         display: Display,
         delay: float = 2.0,
+        log_dir: str | None = None,
     ):
         self.config = config
         self.config_dir = config_dir
@@ -39,7 +44,9 @@ class PipelineEngine:
         self.vars_path = vars_path
         self.display = display
         self.delay = delay
+        self.log_dir = log_dir
         self.executors = ExecutorPool()
+        self._live_signals: list[Signal] = []
 
         # Resume or start fresh
         saved = read_state(state_path)
@@ -152,12 +159,16 @@ class PipelineEngine:
             self._pipeline_rounds = round_num
             self._pipeline_last_stage = stage.name
 
-            self.display.round_header(
-                round_num,
-                stage.name,
-                stage.runner.executor,
-                stage.runner.model,
-            )
+            if stage.is_ensemble:
+                runners_info = [(r.executor, r.model) for r in stage.runners]
+                self.display.round_header_ensemble(round_num, stage.name, runners_info)
+            else:
+                self.display.round_header(
+                    round_num,
+                    stage.name,
+                    stage.runner.executor,
+                    stage.runner.model,
+                )
 
             # pre_step — shell command before main executor
             if stage.pre_step:
@@ -182,8 +193,12 @@ class PipelineEngine:
             # Known signals for this stage
             known = set(stage.on_signal.keys()) | BUILTIN_SIGNALS
 
-            # Run executor with retries, then fallback with retries
-            result = self._run_with_retries(stage, prompt, known)
+            # Run executor(s)
+            self._live_signals = []
+            if stage.is_ensemble:
+                result = self._run_ensemble(stage, prompt, known, round_num)
+            else:
+                result = self._run_with_retries(stage, prompt, known)
 
             # post_step — shell command after main executor (always runs)
             if stage.post_step:
@@ -200,6 +215,8 @@ class PipelineEngine:
                     f"Round failed, "
                     f"consecutive failures {consecutive_failures}/3"
                 )
+                if result.error:
+                    self.display.warn(result.error)
                 if consecutive_failures >= 3:
                     raise PipelineError("3 consecutive round failures")
                 self._wait()
@@ -210,7 +227,7 @@ class PipelineEngine:
             # Signals already displayed in real-time via _on_signal callback
             signals = self._live_signals
 
-            # Find first domain signal for routing
+            # Find first domain signal for routing (ensemble stages route via 'default' only)
             domain = None
             for s in signals:
                 if s.name not in ("var", "update"):
@@ -245,27 +262,44 @@ class PipelineEngine:
 
         return "failed"  # unreachable, loop exits via return or exception
 
+    def _make_callbacks(self, source: str | None):
+        """Build (on_output, on_signal) closures.
+
+        source: per-runner tag for ensemble stages (e.g. "claude-code/opus"),
+                None for single-runner stages.
+        """
+        def on_output(text: str) -> None:
+            self.display.executor_output(text, source=source)
+
+        def on_signal(sig: Signal) -> None:
+            if source:
+                sig.attrs = {**sig.attrs, "source": source}
+            self._on_signal(sig)
+
+        return on_output, on_signal
+
     def _run_with_retries(self, stage: Stage, prompt: str,
                           known: set[str]) -> ExecutorResult:
         """Try primary runner twice, then fallback runner twice.
 
         Returns the first successful result, or the last failed result.
         """
-        from pilot.executors.result import ExecutorResult
-
         runners = [(stage.runner, "primary")]
         if stage.fallback_runner:
             runners.append((stage.fallback_runner, "fallback"))
 
-        result = None
+        on_output, on_signal = self._make_callbacks(None)
+
+        result: ExecutorResult | None = None
         for runner, label in runners:
             executor = self.executors.get(runner.executor)
             for attempt in range(1, 3):
+                # Reset live signals on retry — only keep the final attempt's signals
                 self._live_signals = []
                 result = executor.run(
                     prompt, model=runner.model, known_signals=known,
-                    on_output=self._on_output,
-                    on_signal=self._on_signal,
+                    on_output=on_output,
+                    on_signal=on_signal,
                 )
                 if result.exit_code == 0:
                     return result
@@ -288,35 +322,181 @@ class PipelineEngine:
 
         return result
 
+    def _run_ensemble(self, stage: Stage, prompt: str,
+                      known: set[str], round_num: int) -> ExecutorResult:
+        """Run all runners on the same prompt and write per-runner artifacts.
+
+        Outputs per runner land at <round_dir>/<source>.txt and
+        <round_dir>/<source>.signals.json. PILOT_ENSEMBLE_DIR points at
+        <round_dir> so post_step / next stage can read them.
+        """
+        if not self.log_dir:
+            raise PipelineError(
+                "ensemble stages require an active log directory; "
+                "ensure pilot was started with logging enabled"
+            )
+
+        round_dir = os.path.join(
+            self.log_dir, f"round-{round_num:03d}-{stage.name}"
+        )
+        os.makedirs(round_dir, exist_ok=True)
+
+        os.environ["PILOT_ENSEMBLE_DIR"] = round_dir
+        write_var(self.vars_path, "PILOT_ENSEMBLE_DIR", round_dir)
+
+        runners = stage.runners
+        timeout = stage.per_runner_timeout
+
+        descriptors: list[tuple[Runner, str]] = []
+        seen_slugs: set[str] = set()
+        for r in runners:
+            base = f"{r.executor}-{r.model}" if r.model else r.executor
+            slug = base.replace("/", "-")
+            # Disambiguate duplicate runners
+            if slug in seen_slugs:
+                i = 2
+                while f"{slug}-{i}" in seen_slugs:
+                    i += 1
+                slug = f"{slug}-{i}"
+            seen_slugs.add(slug)
+            descriptors.append((r, slug))
+
+        results: dict[str, ExecutorResult] = {}
+
+        def worker(runner: Runner, source: str) -> tuple[str, ExecutorResult]:
+            on_output, on_signal = self._make_callbacks(source)
+            executor = self.executors.get(runner.executor)
+            cancel = threading.Event()
+            timer: threading.Timer | None = None
+            if timeout:
+                timer = threading.Timer(float(timeout), cancel.set)
+                timer.daemon = True
+                timer.start()
+
+            worker_start = time.monotonic()
+            run_result: ExecutorResult | None = None
+            try:
+                for attempt in range(1, 3):
+                    run_result = executor.run(
+                        prompt, model=runner.model, known_signals=known,
+                        on_output=on_output, on_signal=on_signal,
+                        cancel=cancel,
+                    )
+                    if run_result.exit_code == 0:
+                        break
+                    if cancel.is_set():
+                        break
+                    tag = (
+                        f"{runner.executor}/{runner.model}"
+                        if runner.model else runner.executor
+                    )
+                    self.display.warn(
+                        f"[{source}] {tag} failed "
+                        f"(attempt {attempt}/2, exit {run_result.exit_code})"
+                    )
+                    if attempt < 2:
+                        time.sleep(self.delay)
+            finally:
+                if timer:
+                    timer.cancel()
+
+            if cancel.is_set() and (run_result is None or run_result.exit_code == 0):
+                # Timer fired but executor returned 0 — treat as timeout
+                run_result = ExecutorResult(
+                    output=run_result.output if run_result else "",
+                    exit_code=124,
+                    error=f"per_runner_timeout exceeded ({timeout}s)",
+                    signals=run_result.signals if run_result else [],
+                )
+
+            # Per-runner artifacts
+            try:
+                with open(os.path.join(round_dir, f"{source}.txt"), "w") as f:
+                    f.write(run_result.output or "")
+                with open(os.path.join(round_dir, f"{source}.signals.json"), "w") as f:
+                    json.dump(
+                        [
+                            {"name": s.name, "content": s.content, "attrs": s.attrs}
+                            for s in (run_result.signals or [])
+                        ],
+                        f,
+                        indent=2,
+                    )
+            except OSError as e:
+                self.display.warn(f"[{source}] failed to write artifacts: {e}")
+
+            elapsed = int(time.monotonic() - worker_start)
+            self.display.ensemble_runner_done(
+                source,
+                run_result.exit_code,
+                elapsed,
+                len(run_result.signals or []),
+            )
+            return source, run_result
+
+        if stage.parallel and len(descriptors) > 1:
+            with ThreadPoolExecutor(max_workers=len(descriptors)) as pool:
+                futures = [pool.submit(worker, r, slug) for r, slug in descriptors]
+                for fut in as_completed(futures):
+                    src, res = fut.result()
+                    results[src] = res
+        else:
+            for r, slug in descriptors:
+                src, res = worker(r, slug)
+                results[src] = res
+
+        successes = sum(1 for r in results.values() if r.exit_code == 0)
+        failures = len(runners) - successes
+
+        # Persist counters for post_step / next stage
+        write_var(self.vars_path, "PILOT_ENSEMBLE_SUCCESSES", str(successes))
+        write_var(self.vars_path, "PILOT_ENSEMBLE_FAILURES", str(failures))
+        os.environ["PILOT_ENSEMBLE_SUCCESSES"] = str(successes)
+        os.environ["PILOT_ENSEMBLE_FAILURES"] = str(failures)
+
+        threshold = stage.min_success or len(runners)
+        round_ok = successes >= threshold
+
+        return ExecutorResult(
+            output="",
+            exit_code=0 if round_ok else 1,
+            error=(
+                None if round_ok
+                else f"{failures}/{len(runners)} runner(s) failed; "
+                     f"need >= {threshold} success"
+            ),
+            signals=list(self._live_signals),
+        )
+
     def _build_prompt(self, stage: Stage) -> str:
         """Build the text passed to the executor.
 
         Shell: runner.command (with {{file:}} resolution)
         AI:    stage.prompt  (with {{file:}} resolution)
         """
-        if stage.runner.executor == "shell":
+        if stage.runner is not None and stage.runner.executor == "shell":
             raw = stage.runner.command or ""
         else:
             raw = stage.prompt or ""
 
         return resolve_templates(raw, self.config_dir, self.vars_path)
 
-    def _on_output(self, text: str) -> None:
-        """Real-time callback from executors — log streamed output."""
-        self.display.executor_output(text)
-
-    def _on_signal(self, sig) -> None:
+    def _on_signal(self, sig: Signal) -> None:
         """Real-time callback from executors — display and collect signals."""
         self._live_signals.append(sig)
+        source = sig.attrs.get("source")
         if sig.name == "var" and "key" in sig.attrs:
             write_var(self.vars_path, sig.attrs["key"], sig.content)
             key = rich_escape(sig.attrs["key"])
             val = rich_escape(sig.content)
-            self.display.info(f"[dim]var[/] {key}[dim]=[/]{val}")
+            prefix = f"\\[{source}] " if source else ""
+            self.display.info(f"{prefix}[dim]var[/] {key}[dim]=[/]{val}")
         elif sig.name == "update":
-            self.display.update(rich_escape(sig.content))
+            self.display.update(rich_escape(sig.content), source=source)
         else:
-            self.display.domain_signal(sig.name, rich_escape(sig.content))
+            self.display.domain_signal(
+                sig.name, rich_escape(sig.content), source=source,
+            )
 
     def _run_step(self, label: str, raw_command: str,
                   show_output: bool = False) -> bool:
