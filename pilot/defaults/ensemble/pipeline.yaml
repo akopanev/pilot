@@ -47,7 +47,19 @@ stages:
     runner:
       executor: shell
       command: |
-        cat "$ROUND_DIR"/*.md 2>/dev/null > "$ROUND_DIR/synthesized.md" || true
+        {
+          for f in "$ROUND_DIR"/*.md; do
+            [ -f "$f" ] || continue
+            name=$(basename "$f" .md)
+            [ "$name" = "synthesized" ] && continue
+            echo "# $name"
+            echo
+            cat "$f"
+            echo
+            echo "---"
+            echo
+          done
+        } > "$ROUND_DIR/synthesized.md"
         echo "synthesized -> $ROUND_DIR/synthesized.md"
     on_signal:
       default: __succeed__
