@@ -27,7 +27,7 @@ debugging chatter and will be discarded.
 
 ## Question
 
-{{file:question.md}}
+{{var:QUESTION}}
 
 ## Audience
 

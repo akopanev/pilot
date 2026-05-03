@@ -1,21 +1,15 @@
 # Ensemble pipeline — sparring partners (3 independent takes, no consensus)
 #
-# Run with either:
+# Run:
 #   pilot run .pilot/ensemble/pipeline.yaml --var QUESTION="your question"
-#   pilot run .pilot/ensemble/pipeline.yaml          # uses question.md
 #
-# Output: synthesized.md inside .pilot/ensemble/runs/<timestamp>/
+# Output: synthesized.md inside .pilot/ensemble/runs/<timestamp>-XXXX/
 version: "0.1"
 starting: spar
 
 pre_pipeline: |
-  # Prefer --var QUESTION=...; fall back to question.md.
-  if [ -n "${QUESTION:-}" ]; then
-    printf '%s\n' "$QUESTION" > question.md
-  fi
-  if [ ! -s question.md ]; then
-    echo "ERROR: provide a question via --var QUESTION=... or by editing"
-    echo "       .pilot/ensemble/question.md"
+  if [ -z "${QUESTION:-}" ]; then
+    echo "ERROR: provide a question via --var QUESTION=\"your question\""
     exit 1
   fi
 
@@ -36,7 +30,7 @@ stages:
         vars:
           OUTPUT: "{{var:OUTPUT_OPUS}}"
       - executor: codex
-        model: gpt-5
+        model: gpt-5.5
         vars:
           OUTPUT: "{{var:OUTPUT_GPT5}}"
       - executor: gemini
