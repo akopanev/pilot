@@ -10,6 +10,12 @@ class Runner:
     executor: str           # "shell", "claude-code", "codex", etc.
     model: str | None       # "opus", "o3", "sonnet" — AI executors
     command: str | None      # shell command/script — shell executor
+    vars: dict[str, str] = field(default_factory=dict)
+    """Per-runner template overrides. Each value is itself a template:
+    `{{var:GLOBAL}}` resolves against the pipeline vars file before being
+    merged into the prompt's var namespace for this runner. Used by
+    ensemble stages to give each runner its own OUTPUT path, ROLE, etc.,
+    without polluting global vars."""
 
 
 @dataclass

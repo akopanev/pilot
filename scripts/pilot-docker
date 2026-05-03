@@ -78,20 +78,37 @@ def _security_find_credentials(service_name: str) -> Optional[str]:
 
 
 def extract_macos_credentials(claude_home: Path) -> Optional[Path]:
-    """On macOS, extract claude credentials from Keychain if not on disk."""
+    """On macOS, extract claude credentials from Keychain if not on disk.
+
+    Best-effort: never proactively unlocks the keychain (would cause an
+    unexpected password prompt for pipelines that don't even use
+    claude-code). Warns when nothing is found so claude-using pipelines
+    fail fast at startup instead of mid-run.
+    """
     if platform.system() != "Darwin":
         return None
     if (claude_home / ".credentials.json").exists():
+        return None
+    if not claude_home.exists():
+        # No claude config at all — likely doesn't use claude-code.
+        # Stay silent; if a pipeline needs claude, the CLI will error.
         return None
 
     service = keychain_service_name(claude_home)
     creds_json = _security_find_credentials(service)
     if not creds_json:
-        print("unlocking macOS Keychain for Claude credentials...", file=sys.stderr)
-        subprocess.run(["security", "unlock-keychain"], capture_output=True, check=False)
-        creds_json = _security_find_credentials(service)
-
-    if not creds_json:
+        print(
+            "warning: no Claude credentials found (keychain locked or empty);",
+            file=sys.stderr,
+        )
+        print(
+            "         pipelines using claude-code will fail at runtime —",
+            file=sys.stderr,
+        )
+        print(
+            "         run `claude` once on the host to authenticate.",
+            file=sys.stderr,
+        )
         return None
 
     fd, tmp_path = tempfile.mkstemp()

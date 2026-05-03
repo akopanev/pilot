@@ -23,7 +23,13 @@ def _parse_runner(data: dict, label: str) -> Runner:
     command = data.get("command")
     if executor == "shell" and not command:
         raise ConfigError(f"{label}: shell executor requires 'command'")
-    return Runner(executor=executor, model=model, command=command)
+
+    vars_raw = data.get("vars", {})
+    if not isinstance(vars_raw, dict):
+        raise ConfigError(f"{label}: 'vars' must be a mapping")
+    runner_vars = {str(k): str(v) for k, v in vars_raw.items()}
+
+    return Runner(executor=executor, model=model, command=command, vars=runner_vars)
 
 
 def _parse_transition(data, signal_name: str, stage_name: str) -> Transition:

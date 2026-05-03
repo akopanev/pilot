@@ -21,12 +21,16 @@ def resolve_templates(
     content: str,
     base_dir: str,
     vars_path: str | None = None,
+    vars_overrides: dict[str, str] | None = None,
     _depth: int = 0,
 ) -> str:
     """Replace {{file:path}} and {{var:NAME}} with resolved values.
 
     {{file:path}} — inline file contents (relative to base_dir, recursive).
-    {{var:NAME}}  — inline var value from vars file.
+    {{var:NAME}}  — inline a var. Resolution order:
+                    file vars (from vars_path) overlaid by vars_overrides.
+                    `vars_overrides` is the per-call escape hatch the engine
+                    uses for per-runner specialisation in ensemble stages.
     """
     if _depth > MAX_DEPTH:
         raise TemplateError(f"Template recursion depth exceeded ({MAX_DEPTH})")
@@ -41,13 +45,16 @@ def resolve_templates(
         with open(abs_path) as f:
             file_content = f.read()
 
-        return resolve_templates(file_content, base_dir, vars_path, _depth + 1)
+        return resolve_templates(
+            file_content, base_dir, vars_path, vars_overrides, _depth + 1,
+        )
 
     result = FILE_RE.sub(_replace_file, content)
 
-    # Resolve vars (no recursion needed — vars are plain values)
-    if vars_path:
-        vars_dict = read_vars(vars_path)
+    if vars_path or vars_overrides:
+        vars_dict: dict[str, str] = read_vars(vars_path) if vars_path else {}
+        if vars_overrides:
+            vars_dict.update(vars_overrides)
 
         def _replace_var(m: re.Match) -> str:
             name = m.group(1).strip()

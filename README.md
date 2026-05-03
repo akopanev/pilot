@@ -110,30 +110,34 @@ Each stage has a `runner` and optional `fallback_runner`. Primary retries twice,
 
 ### Ensemble stages
 
-Run the same prompt across N runners in parallel — useful for brainstorm, architecture, multi-model second opinions:
+Run the same prompt across N runners in parallel — useful for brainstorm, architecture, multi-model second opinions. Each runner can carry its own `vars:` block (per-runner template overrides) so the same prompt can address each one differently.
 
 ```yaml
 brainstorm:
-  prompt: "{{file:question.md}}"
+  pre_step: |
+    {{file:scripts/setup.sh}}        # mkdir round dir, emit OUTPUT_* vars
+  prompt: "{{file:prompts/spar.md}}"  # references {{var:OUTPUT}}
   runners:
-    - { executor: claude-code, model: opus }
-    - { executor: codex, model: gpt-5 }
-    - { executor: gemini, model: gemini-2.5-pro }
-  parallel: true                  # default; set false to serialize
-  min_success: 2                  # round passes if K of N succeed (default: all)
-  per_runner_timeout: 600         # seconds; default: none
+    - executor: claude-code
+      model: opus
+      vars:
+        OUTPUT: "{{var:OUTPUT_OPUS}}"
+    - executor: codex
+      model: gpt-5
+      vars:
+        OUTPUT: "{{var:OUTPUT_GPT5}}"
+    - executor: gemini
+      model: gemini-2.5-pro
+      vars:
+        OUTPUT: "{{var:OUTPUT_GEMINI}}"
+  parallel: true                    # default; set false to serialize
+  min_success: 2                    # round passes if K of N succeed (default: all)
+  per_runner_timeout: 600           # seconds; default: none
   on_signal:
-    default: synthesize           # ensemble stages only support 'default'
-
-synthesize:
-  runner:
-    executor: shell
-    command: bash scripts/synthesize.sh
-  on_signal:
-    default: __succeed__
+    default: synthesize             # ensemble stages only support 'default'
 ```
 
-Per-runner outputs land at `$PILOT_ENSEMBLE_DIR/<executor>-<model>.txt` (and `.signals.json`). The synthesize stage reads them and produces the final artifact. `PILOT_ENSEMBLE_SUCCESSES` / `PILOT_ENSEMBLE_FAILURES` are exported for post-processing.
+`pre_step` (and `post_step`, `pre_pipeline`, etc.) can publish vars by emitting `<signal:var key=NAME>VALUE</signal:var>` to stdout — same protocol agents already use. The engine resolves each runner's `vars:` against the current var namespace before substituting them into that runner's prompt.
 
 Constraints: ensemble stages require `prompt` (no `shell` executor in `runners`), can't define `fallback_runner`, and may only have `default` in `on_signal` — route via the next stage's signals.
 
@@ -178,7 +182,16 @@ Prompts and commands support two template types, resolved fresh each round:
 
 Key-value pairs persisted in `.pilot/vars`. Available as `{{var:NAME}}` in templates and as `$NAME` env vars in shell stages.
 
-Set from three places: `vars:` in config, `<signal:var>` from agents, or direct file edit. Cleaned on successful pipeline exit; preserved on failure.
+Sources, in precedence order (later overrides earlier):
+
+1. `vars:` block in `pipeline.yaml` — defaults, written only when not already set.
+2. `--var KEY=VALUE` on `pilot run` — explicit user input at launch (single-line; use `{{file:...}}` for multi-line).
+3. `<signal:var key=NAME>VALUE</signal:var>` from any signal-scanned context — agent stdout, `pre_step`, `post_step`, and pipeline-level hooks (`pre_pipeline`, `on_pipeline_*`). Same protocol everywhere.
+4. Direct file edit of `.pilot/<dir>/vars`.
+
+Per-runner overrides (`runner.vars: {...}`) layer on top of the above for a single executor invocation only — they don't mutate the shared vars file.
+
+Cleaned on successful pipeline exit; preserved on failure (so resumes can pick up where they left off).
 
 ## Default Pipelines
 
@@ -245,6 +258,8 @@ Hermetic container with claude-code, codex, gemini, opencode pre-installed. Auto
 pilot run <pipeline.yaml>              Run the pipeline
 pilot run <pipeline.yaml> --dry-run    Show stages without executing
 pilot run <pipeline.yaml> --verbose    Stream executor output to terminal
+pilot run <pipeline.yaml> --var K=V    Set a pipeline var at launch (repeatable);
+                                       overrides yaml `vars:` defaults
 pilot validate <pipeline.yaml>         Validate config
 pilot init                             List available pipelines
 pilot init <name> [<name>...]          Install selected pipelines into .pilot/

@@ -15,6 +15,24 @@ from pilot.display import Display
 from pilot.engine import PipelineEngine, PipelineError
 
 
+def _parse_cli_var(arg: str) -> tuple[str, str]:
+    """Parse a `KEY=VALUE` string from --var. Newlines disallowed."""
+    if "=" not in arg:
+        raise argparse.ArgumentTypeError(
+            f"--var must be KEY=VALUE (got: {arg!r})"
+        )
+    key, _, value = arg.partition("=")
+    key = key.strip()
+    if not key:
+        raise argparse.ArgumentTypeError(f"--var key is empty: {arg!r}")
+    if "\n" in value:
+        raise argparse.ArgumentTypeError(
+            f"--var values cannot contain newlines (key: {key}); "
+            f"use {{file:...}} templates for multi-line content"
+        )
+    return key, value
+
+
 def cmd_run(args) -> None:
     display = Display(verbose=args.verbose)
     display.banner()
@@ -25,10 +43,16 @@ def cmd_run(args) -> None:
     state_path = os.path.join(config_dir, "state")
     vars_path = os.path.join(config_dir, "vars")
 
+    cli_vars: dict[str, str] = dict(args.vars) if args.vars else {}
+
     if args.dry_run:
         display.info(f"Pipeline: {config_path}")
         display.info(f"Version: {config.version}")
         display.info(f"Start: {config.start_stage}")
+        if cli_vars:
+            display.info("CLI vars:")
+            for k, v in cli_vars.items():
+                display.info(f"  [dim]{k}=[/]{v}")
         display.dry_run_stages(config.stages)
         return
 
@@ -51,6 +75,7 @@ def cmd_run(args) -> None:
         vars_path=vars_path,
         display=display,
         log_dir=log_dir,
+        cli_vars=cli_vars,
     )
     try:
         engine.run()
@@ -240,6 +265,12 @@ def main() -> None:
     run_p.add_argument("pipeline", help="Path to pipeline yaml")
     run_p.add_argument("--dry-run", action="store_true")
     run_p.add_argument("--verbose", action="store_true")
+    run_p.add_argument(
+        "--var", action="append", dest="vars", default=[],
+        type=_parse_cli_var, metavar="KEY=VALUE",
+        help="Set a pipeline var. Repeatable. CLI vars take precedence "
+             "over `vars:` declared in the pipeline yaml.",
+    )
 
     # pilot validate <pipeline.yaml>
     val_p = sub.add_parser("validate", help="Validate pipeline yaml")

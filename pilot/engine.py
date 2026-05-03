@@ -15,7 +15,7 @@ from pilot.executors.result import ExecutorResult
 from pilot.models import PipelineConfig, PipelineState, Runner, Stage
 from rich.markup import escape as rich_escape
 
-from pilot.signals import BUILTIN_SIGNALS, Signal
+from pilot.signals import BUILTIN_SIGNALS, Signal, parse_signals
 from pilot.state import clear_state, read_state, write_state
 from pilot.templates import TemplateError, resolve_templates
 from pilot.vars import clear_vars, export_vars, write_var
@@ -37,6 +37,7 @@ class PipelineEngine:
         display: Display,
         delay: float = 2.0,
         log_dir: str | None = None,
+        cli_vars: dict[str, str] | None = None,
     ):
         self.config = config
         self.config_dir = config_dir
@@ -45,6 +46,7 @@ class PipelineEngine:
         self.display = display
         self.delay = delay
         self.log_dir = log_dir
+        self.cli_vars = cli_vars or {}
         self.executors = ExecutorPool()
         self._live_signals: list[Signal] = []
 
@@ -88,6 +90,32 @@ class PipelineEngine:
 
         export_vars(self.vars_path)
 
+    def _apply_var(self, key: str, value: str) -> None:
+        """Persist a var to disk and into os.environ in one atomic step.
+
+        Used for both agent-emitted <signal:var> tags and shell-step
+        signal-scanning so vars become live for downstream consumers in
+        the same round.
+        """
+        write_var(self.vars_path, key, value)
+        os.environ[key] = value
+
+    def _handle_var_signal(self, sig: Signal, source: str | None = None) -> bool:
+        """If `sig` is a `<signal:var key=K>V</signal:var>` tag, persist it
+        and emit a display line. Returns True iff the signal was a var.
+
+        Centralises the var-handling logic shared by `_on_signal` (executor
+        callbacks) and `_run_step` (shell-hook stdout scanning).
+        """
+        if sig.name != "var" or "key" not in sig.attrs:
+            return False
+        self._apply_var(sig.attrs["key"], sig.content)
+        key = rich_escape(sig.attrs["key"])
+        val = rich_escape(sig.content)
+        prefix = f"\\[{source}] " if source else ""
+        self.display.info(f"{prefix}[dim]var[/] {key}[dim]=[/]{val}")
+        return True
+
     @staticmethod
     def _fmt_duration(seconds: int) -> str:
         if seconds >= 3600:
@@ -105,6 +133,12 @@ class PipelineEngine:
 
         # Load .env (secrets) before anything
         self._load_env_file()
+
+        # CLI vars: applied before _sync_env so they take precedence over
+        # pipeline-yaml `vars:` defaults (which _sync_env writes only when
+        # absent). They remain mutable by pre_step / agent signals at runtime.
+        for key, value in self.cli_vars.items():
+            self._apply_var(key, value)
 
         # Sync config vars so pre_pipeline can use them
         self._sync_env()
@@ -170,7 +204,8 @@ class PipelineEngine:
                     stage.runner.model,
                 )
 
-            # pre_step — shell command before main executor
+            # pre_step — shell command before main executor; may emit
+            # <signal:var> tags that become live for the executor below.
             if stage.pre_step:
                 pre_ok = self._run_step("pre_step", stage.pre_step)
                 if not pre_ok:
@@ -184,21 +219,25 @@ class PipelineEngine:
                     self._wait()
                     continue
 
-            # Build prompt
-            try:
-                prompt = self._build_prompt(stage)
-            except TemplateError as e:
-                raise PipelineError(f"Template error: {e}") from e
+            # Per-runner stages defer template resolution until each worker
+            # spawns, so runner.vars overrides apply correctly.
+            raw_prompt = self._get_raw_prompt(stage)
 
-            # Known signals for this stage
-            known = set(stage.on_signal.keys()) | BUILTIN_SIGNALS
+            # Known signals for this stage. Ensemble stages capture every
+            # signal name (informational tags like <signal:done verdict=...>
+            # belong on disk even though routing always falls through to
+            # 'default').
+            if stage.is_ensemble:
+                known = None
+            else:
+                known = set(stage.on_signal.keys()) | BUILTIN_SIGNALS
 
             # Run executor(s)
             self._live_signals = []
             if stage.is_ensemble:
-                result = self._run_ensemble(stage, prompt, known, round_num)
+                result = self._run_ensemble(stage, raw_prompt, known, round_num)
             else:
-                result = self._run_with_retries(stage, prompt, known)
+                result = self._run_with_retries(stage, raw_prompt, known)
 
             # post_step — shell command after main executor (always runs)
             if stage.post_step:
@@ -278,8 +317,29 @@ class PipelineEngine:
 
         return on_output, on_signal
 
-    def _run_with_retries(self, stage: Stage, prompt: str,
-                          known: set[str]) -> ExecutorResult:
+    def _resolve_runner_vars(self, runner: Runner) -> dict[str, str]:
+        """Resolve each runner.vars value as a template against global vars.
+
+        This lets ensemble runners reference pre_step-emitted vars
+        (`{{var:ROUND_DIR}}`) inside their per-runner config without any
+        new template namespace.
+        """
+        if not runner.vars:
+            return {}
+        resolved: dict[str, str] = {}
+        for k, v in runner.vars.items():
+            resolved[k] = resolve_templates(v, self.config_dir, self.vars_path)
+        return resolved
+
+    def _resolve_prompt(self, raw: str, runner: Runner) -> str:
+        """Resolve a raw prompt with runner.vars merged as overrides."""
+        return resolve_templates(
+            raw, self.config_dir, self.vars_path,
+            vars_overrides=self._resolve_runner_vars(runner) or None,
+        )
+
+    def _run_with_retries(self, stage: Stage, raw_prompt: str,
+                          known: set[str] | None) -> ExecutorResult:
         """Try primary runner twice, then fallback runner twice.
 
         Returns the first successful result, or the last failed result.
@@ -292,6 +352,11 @@ class PipelineEngine:
 
         result: ExecutorResult | None = None
         for runner, label in runners:
+            try:
+                prompt = self._resolve_prompt(raw_prompt, runner)
+            except TemplateError as e:
+                raise PipelineError(f"Template error: {e}") from e
+
             executor = self.executors.get(runner.executor)
             for attempt in range(1, 3):
                 # Reset live signals on retry — only keep the final attempt's signals
@@ -322,27 +387,26 @@ class PipelineEngine:
 
         return result
 
-    def _run_ensemble(self, stage: Stage, prompt: str,
-                      known: set[str], round_num: int) -> ExecutorResult:
-        """Run all runners on the same prompt and write per-runner artifacts.
+    def _run_ensemble(self, stage: Stage, raw_prompt: str,
+                      known: set[str] | None,
+                      round_num: int) -> ExecutorResult:
+        """Run all runners on the same prompt and write per-runner internal logs.
 
-        Outputs per runner land at <round_dir>/<source>.txt and
-        <round_dir>/<source>.signals.json. PILOT_ENSEMBLE_DIR points at
-        <round_dir> so post_step / next stage can read them.
+        Each worker resolves the prompt with its own runner.vars overrides.
+        Where the model writes its formatted artifact is entirely the
+        pipeline author's choice (declared via `runner.vars` and
+        referenced inside the prompt as `{{var:NAME}}`).
+
+        The engine still keeps an internal log of each runner's stdout +
+        parsed signals under <log_dir>/round-NNN-<stage>/ for debugging,
+        but does not expose that path to the pipeline.
         """
-        if not self.log_dir:
-            raise PipelineError(
-                "ensemble stages require an active log directory; "
-                "ensure pilot was started with logging enabled"
+        log_round_dir: str | None = None
+        if self.log_dir:
+            log_round_dir = os.path.join(
+                self.log_dir, f"round-{round_num:03d}-{stage.name}"
             )
-
-        round_dir = os.path.join(
-            self.log_dir, f"round-{round_num:03d}-{stage.name}"
-        )
-        os.makedirs(round_dir, exist_ok=True)
-
-        os.environ["PILOT_ENSEMBLE_DIR"] = round_dir
-        write_var(self.vars_path, "PILOT_ENSEMBLE_DIR", round_dir)
+            os.makedirs(log_round_dir, exist_ok=True)
 
         runners = stage.runners
         timeout = stage.per_runner_timeout
@@ -352,7 +416,6 @@ class PipelineEngine:
         for r in runners:
             base = f"{r.executor}-{r.model}" if r.model else r.executor
             slug = base.replace("/", "-")
-            # Disambiguate duplicate runners
             if slug in seen_slugs:
                 i = 2
                 while f"{slug}-{i}" in seen_slugs:
@@ -365,6 +428,14 @@ class PipelineEngine:
 
         def worker(runner: Runner, source: str) -> tuple[str, ExecutorResult]:
             on_output, on_signal = self._make_callbacks(source)
+            try:
+                worker_prompt = self._resolve_prompt(raw_prompt, runner)
+            except TemplateError as e:
+                self.display.warn(f"[{source}] template error: {e}")
+                return source, ExecutorResult(
+                    output="", exit_code=1, error=str(e), signals=[],
+                )
+
             executor = self.executors.get(runner.executor)
             cancel = threading.Event()
             timer: threading.Timer | None = None
@@ -378,7 +449,7 @@ class PipelineEngine:
             try:
                 for attempt in range(1, 3):
                     run_result = executor.run(
-                        prompt, model=runner.model, known_signals=known,
+                        worker_prompt, model=runner.model, known_signals=known,
                         on_output=on_output, on_signal=on_signal,
                         cancel=cancel,
                     )
@@ -400,8 +471,10 @@ class PipelineEngine:
                 if timer:
                     timer.cancel()
 
-            if cancel.is_set() and (run_result is None or run_result.exit_code == 0):
-                # Timer fired but executor returned 0 — treat as timeout
+            # If the timer fired, mark as timeout — but only when we don't
+            # already have a successful result. A clean exit_code 0 wins
+            # over a late-firing cancel (race window during executor cleanup).
+            if cancel.is_set() and (run_result is None or run_result.exit_code != 0):
                 run_result = ExecutorResult(
                     output=run_result.output if run_result else "",
                     exit_code=124,
@@ -409,21 +482,23 @@ class PipelineEngine:
                     signals=run_result.signals if run_result else [],
                 )
 
-            # Per-runner artifacts
-            try:
-                with open(os.path.join(round_dir, f"{source}.txt"), "w") as f:
-                    f.write(run_result.output or "")
-                with open(os.path.join(round_dir, f"{source}.signals.json"), "w") as f:
-                    json.dump(
-                        [
-                            {"name": s.name, "content": s.content, "attrs": s.attrs}
-                            for s in (run_result.signals or [])
-                        ],
-                        f,
-                        indent=2,
-                    )
-            except OSError as e:
-                self.display.warn(f"[{source}] failed to write artifacts: {e}")
+            # Internal debug logs only — NOT the user's artifact, which
+            # the model writes to wherever runner.vars told it to.
+            if log_round_dir:
+                try:
+                    with open(os.path.join(log_round_dir, f"{source}.txt"), "w") as f:
+                        f.write(run_result.output or "")
+                    with open(os.path.join(log_round_dir, f"{source}.signals.json"), "w") as f:
+                        json.dump(
+                            [
+                                {"name": s.name, "content": s.content, "attrs": s.attrs}
+                                for s in (run_result.signals or [])
+                            ],
+                            f,
+                            indent=2,
+                        )
+                except OSError as e:
+                    self.display.warn(f"[{source}] failed to write log: {e}")
 
             elapsed = int(time.monotonic() - worker_start)
             self.display.ensemble_runner_done(
@@ -448,12 +523,6 @@ class PipelineEngine:
         successes = sum(1 for r in results.values() if r.exit_code == 0)
         failures = len(runners) - successes
 
-        # Persist counters for post_step / next stage
-        write_var(self.vars_path, "PILOT_ENSEMBLE_SUCCESSES", str(successes))
-        write_var(self.vars_path, "PILOT_ENSEMBLE_FAILURES", str(failures))
-        os.environ["PILOT_ENSEMBLE_SUCCESSES"] = str(successes)
-        os.environ["PILOT_ENSEMBLE_FAILURES"] = str(failures)
-
         threshold = stage.min_success or len(runners)
         round_ok = successes >= threshold
 
@@ -468,30 +537,25 @@ class PipelineEngine:
             signals=list(self._live_signals),
         )
 
-    def _build_prompt(self, stage: Stage) -> str:
-        """Build the text passed to the executor.
+    def _get_raw_prompt(self, stage: Stage) -> str:
+        """Return the unresolved prompt (or shell command) for a stage.
 
-        Shell: runner.command (with {{file:}} resolution)
-        AI:    stage.prompt  (with {{file:}} resolution)
+        Resolution is deferred to per-runner time so runner.vars overrides
+        compose correctly.
         """
+        if stage.is_ensemble:
+            return stage.prompt or ""
         if stage.runner is not None and stage.runner.executor == "shell":
-            raw = stage.runner.command or ""
-        else:
-            raw = stage.prompt or ""
-
-        return resolve_templates(raw, self.config_dir, self.vars_path)
+            return stage.runner.command or ""
+        return stage.prompt or ""
 
     def _on_signal(self, sig: Signal) -> None:
         """Real-time callback from executors — display and collect signals."""
         self._live_signals.append(sig)
         source = sig.attrs.get("source")
-        if sig.name == "var" and "key" in sig.attrs:
-            write_var(self.vars_path, sig.attrs["key"], sig.content)
-            key = rich_escape(sig.attrs["key"])
-            val = rich_escape(sig.content)
-            prefix = f"\\[{source}] " if source else ""
-            self.display.info(f"{prefix}[dim]var[/] {key}[dim]=[/]{val}")
-        elif sig.name == "update":
+        if self._handle_var_signal(sig, source=source):
+            return
+        if sig.name == "update":
             self.display.update(rich_escape(sig.content), source=source)
         else:
             self.display.domain_signal(
@@ -501,6 +565,11 @@ class PipelineEngine:
     def _run_step(self, label: str, raw_command: str,
                   show_output: bool = False) -> bool:
         """Run a shell command. Returns True on success.
+
+        Stdout is scanned for `<signal:var key=NAME>VALUE</signal:var>`
+        tags so pre/post hooks can publish vars using the same protocol
+        agents use. Vars are applied to both the vars file and os.environ
+        immediately so the same round's executor can see them.
 
         show_output: True for pipeline hooks (always visible),
                      False for stage pre/post steps (verbose only).
@@ -522,6 +591,9 @@ class PipelineEngine:
         )
 
         if proc.stdout:
+            for sig in parse_signals(proc.stdout):
+                self._handle_var_signal(sig)
+
             for line in proc.stdout.strip().splitlines():
                 if show_output:
                     self.display.info(f"  [dim]{line}[/]")

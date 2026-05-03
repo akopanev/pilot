@@ -1,0 +1,59 @@
+# Ensemble pipeline — sparring partners (3 independent takes, no consensus)
+#
+# Run with either:
+#   pilot run .pilot/ensemble/pipeline.yaml --var QUESTION="your question"
+#   pilot run .pilot/ensemble/pipeline.yaml          # uses question.md
+#
+# Output: synthesized.md inside .pilot/ensemble/runs/<timestamp>/
+version: "0.1"
+starting: spar
+
+pre_pipeline: |
+  # Prefer --var QUESTION=...; fall back to question.md.
+  if [ -n "${QUESTION:-}" ]; then
+    printf '%s\n' "$QUESTION" > question.md
+  fi
+  if [ ! -s question.md ]; then
+    echo "ERROR: provide a question via --var QUESTION=... or by editing"
+    echo "       .pilot/ensemble/question.md"
+    exit 1
+  fi
+
+stages:
+  spar:
+    pre_step: |
+      mkdir -p "$PILOT_CONFIG_DIR/runs"
+      ROUND_DIR=$(mktemp -d "$PILOT_CONFIG_DIR/runs/$(date +%Y%m%d-%H%M%S)-XXXX")
+      echo "<signal:var key=ROUND_DIR>$ROUND_DIR</signal:var>"
+      echo "<signal:var key=OUTPUT_OPUS>$ROUND_DIR/opus.md</signal:var>"
+      echo "<signal:var key=OUTPUT_GPT5>$ROUND_DIR/gpt5.md</signal:var>"
+      echo "<signal:var key=OUTPUT_GEMINI>$ROUND_DIR/gemini.md</signal:var>"
+    prompt: |
+      {{file:prompts/spar.md}}
+    runners:
+      - executor: claude-code
+        model: opus
+        vars:
+          OUTPUT: "{{var:OUTPUT_OPUS}}"
+      - executor: codex
+        model: gpt-5
+        vars:
+          OUTPUT: "{{var:OUTPUT_GPT5}}"
+      - executor: gemini
+        model: gemini-2.5-pro
+        vars:
+          OUTPUT: "{{var:OUTPUT_GEMINI}}"
+    parallel: true
+    min_success: 2
+    per_runner_timeout: 600
+    on_signal:
+      default: synthesize
+
+  synthesize:
+    runner:
+      executor: shell
+      command: |
+        cat "$ROUND_DIR"/*.md 2>/dev/null > "$ROUND_DIR/synthesized.md" || true
+        echo "synthesized -> $ROUND_DIR/synthesized.md"
+    on_signal:
+      default: __succeed__
