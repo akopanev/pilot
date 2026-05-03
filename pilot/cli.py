@@ -16,7 +16,9 @@ from pilot.engine import PipelineEngine, PipelineError
 
 
 def _parse_cli_var(arg: str) -> tuple[str, str]:
-    """Parse a `KEY=VALUE` string from --var. Newlines disallowed."""
+    """Parse a `KEY=VALUE` string from --var. Newlines are encoded into
+    the vars file as `\\n` literals; multi-line values pass through
+    transparently for template substitution and subprocess env."""
     if "=" not in arg:
         raise argparse.ArgumentTypeError(
             f"--var must be KEY=VALUE (got: {arg!r})"
@@ -25,11 +27,6 @@ def _parse_cli_var(arg: str) -> tuple[str, str]:
     key = key.strip()
     if not key:
         raise argparse.ArgumentTypeError(f"--var key is empty: {arg!r}")
-    if "\n" in value:
-        raise argparse.ArgumentTypeError(
-            f"--var values cannot contain newlines (key: {key}); "
-            f"use {{file:...}} templates for multi-line content"
-        )
     return key, value
 
 

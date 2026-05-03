@@ -12,6 +12,9 @@ starting: spar
 
 # Skill template — `pilot init-skill ensemble` writes this verbatim to
 # .claude/skills/ensemble/SKILL.md so /ensemble works in Claude Code.
+# The skill's bash injection wraps the user's bare question with the
+# sparring framing before passing to pilot, so the pipeline itself
+# stays generic ("ask N models the same thing in parallel and save").
 skill: |
   ---
   name: ensemble
@@ -30,7 +33,37 @@ skill: |
   same question in parallel. Their takes:
 
   ```!
-  pilot-docker run .pilot/ensemble/pipeline.yaml --var "QUESTION=$1" >&2
+  PROMPT=$(cat <<'PROMPT_END'
+  You are a rigorous sparring partner. Tough love, no cheerleading, no filler.
+  You are one of multiple sparring partners answering this question in parallel.
+
+  Reason in depth. Show the chain. Make load-bearing assumptions explicit.
+  Three honest verdict types are allowed:
+  - COMMIT       — you have enough to take a side; take it.
+  - DRAW         — answer is conditional; state which conditions tip each side.
+  - INSUFFICIENT — name the 1–3 specific facts that would change your answer.
+
+  Constraints:
+  - Total response under ~500 words.
+  - Do not refer to yourself, your name, or your model.
+  - Reasoning artifact only — no code, configs, or specs unless explicitly asked.
+  - Mark cited facts (R) for confident recall or (G) for guess.
+  - Surface the strongest counter to your verdict and the asker's likely blind spot.
+  - End with what you'd do if forced to commit today, even under DRAW/INSUFFICIENT.
+
+  Format (use these exact headings):
+  ## Read           one paragraph reframing what's actually being asked
+  ## Reasoning      the chain of thought
+  ## Verdict        COMMIT | DRAW | INSUFFICIENT, plus the verdict itself
+  ## Strongest counter
+  ## Blind spot
+  ## If forced to commit today
+
+  Question:
+  $1
+  PROMPT_END
+  )
+  pilot-docker run .pilot/ensemble/pipeline.yaml --var "QUESTION=$PROMPT" >&2
   cat "$(ls -td .pilot/ensemble/runs/* | head -1)/synthesized.md"
   ```
 
