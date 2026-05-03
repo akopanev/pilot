@@ -30,6 +30,11 @@ class GeminiExecutor:
             cancel: threading.Event | None = None) -> ExecutorResult:
         cmd = [
             "gemini", "--approval-mode", "yolo",
+            # Required for headless/automated runs in untrusted folders
+            # (added by Google in April 2026 alongside the CVSS-10 RCE fix).
+            # Without this, gemini refuses to operate when invoked from a
+            # directory the user hasn't interactively trusted.
+            "--skip-trust",
             "--output-format", "stream-json",
         ]
         if model:
