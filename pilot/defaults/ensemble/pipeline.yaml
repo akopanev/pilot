@@ -112,6 +112,7 @@ stages:
     pre_step: |
       mkdir -p "$PILOT_CONFIG_DIR/runs"
       ROUND_DIR=$(mktemp -d "$PILOT_CONFIG_DIR/runs/$(date +%Y%m%d-%H%M%S)-XXXX")
+      printf '%s\n' "$QUESTION" > "$ROUND_DIR/question.md"
       echo "<signal:var key=ROUND_DIR>$ROUND_DIR</signal:var>"
       echo "<signal:var key=OUTPUT_GLM5>$ROUND_DIR/glm5.md</signal:var>"
       echo "<signal:var key=OUTPUT_GPT5>$ROUND_DIR/gpt5.md</signal:var>"
@@ -145,7 +146,9 @@ stages:
           for f in "$ROUND_DIR"/*.md; do
             [ -f "$f" ] || continue
             name=$(basename "$f" .md)
-            [ "$name" = "synthesized" ] && continue
+            case "$name" in
+              synthesized|question) continue ;;
+            esac
             echo "# $name"
             echo
             cat "$f"
