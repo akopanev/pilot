@@ -2,6 +2,25 @@
 
 Config-driven state machine for AI agent workflows. Define stages, signals, and transitions in YAML — the engine runs the graph.
 
+## CLI
+
+```
+pilot run <pipeline.yaml>              Run the pipeline
+pilot run <pipeline.yaml> --dry-run    Show stages without executing
+pilot run <pipeline.yaml> --verbose    Stream executor output to terminal
+pilot run <pipeline.yaml> --var K=V    Set a pipeline var at launch (repeatable);
+                                       overrides yaml `vars:` defaults
+pilot validate <pipeline.yaml>         Validate config
+pilot init                             List available pipelines
+pilot init <name> [<name>...]          Install selected pipelines into .pilot/
+pilot init --all [--force]             Install everything (--force to overwrite)
+pilot init-skill                       List installed pipelines that have a skill template
+pilot init-skill <name> [--force]      Copy <pipeline>'s SKILL.md template into
+                                       .claude/skills/<name>/ for use in Claude Code
+pilot graph <pipeline.yaml>            Generate PNG visualization of the pipeline
+                                       (-o FILE sets output path; --no-open skips opening)
+```
+
 ## Quick Start
 
 ```bash
@@ -101,12 +120,26 @@ Each stage supports optional `pre_step` and `post_step` — shell commands that 
 |----------|-------------|
 | `shell` | Shell scripts/commands (uses `command:`) |
 | `claude-code` | Claude Code (`--dangerously-skip-permissions`) |
-| `codex` | OpenAI Codex (`--sandbox full-auto`) |
+| `codex` | OpenAI Codex (`--dangerously-bypass-approvals-and-sandbox`) |
 | `gemini` | Google Gemini CLI (`--approval-mode yolo`) |
-| `opencode` | OpenCode (`--dangerous`) |
+| `antigravity` | Google Antigravity CLI / `agy` (`--dangerously-skip-permissions`) |
+| `opencode` | OpenCode (`opencode run -m MODEL PROMPT`) |
 | anything else | Generic CLI (`<tool> --model M -p PROMPT`) |
 
 Each stage has a `runner` and optional `fallback_runner`. Primary retries twice, then fallback retries twice. Three consecutive round failures stop the pipeline.
+
+A runner takes `executor` and optional `model`. Add `args:` — a list of raw CLI tokens appended verbatim to that executor's invocation — to tune anything pilot doesn't model directly. They land after the executor's own default flags (so they can override them) and just before the prompt, and are resolved per-runner, so `fallback_runner` and each ensemble runner carry their own. The shell executor rejects `args:` (put flags in `command:`).
+
+```yaml
+runner:
+  executor: codex
+  model: gpt-5.5
+  args: ["-c", "model_reasoning_effort=high"]   # codex layers -c last-wins
+fallback_runner:
+  executor: claude-code
+  model: opus
+  args: ["--effort", "high"]                      # each CLI's own flags
+```
 
 ### Ensemble stages
 
@@ -185,7 +218,7 @@ Key-value pairs persisted in `.pilot/vars`. Available as `{{var:NAME}}` in templ
 Sources, in precedence order (later overrides earlier):
 
 1. `vars:` block in `pipeline.yaml` — defaults, written only when not already set.
-2. `--var KEY=VALUE` on `pilot run` — explicit user input at launch (single-line; use `{{file:...}}` for multi-line).
+2. `--var KEY=VALUE` on `pilot run` — explicit user input at launch (multi-line values pass through; newlines are stored as `\n` literals in the vars file).
 3. `<signal:var key=NAME>VALUE</signal:var>` from any signal-scanned context — agent stdout, `pre_step`, `post_step`, and pipeline-level hooks (`pre_pipeline`, `on_pipeline_*`). Same protocol everywhere.
 4. Direct file edit of `.pilot/<dir>/vars`.
 
@@ -205,6 +238,7 @@ Cleaned on successful pipeline exit; preserved on failure (so resumes can pick u
 | **plan** | `plan/pipeline.yaml` | Create epics → pick epic → decompose into tasks (loop) |
 | **convert** | `convert/pipeline.yaml` | iOS (Swift/Obj-C) → Dart (Flutter) source conversion |
 | **localize** | `localize/pipeline.yaml` | Translate content into multiple locales |
+| **ensemble** | `ensemble/pipeline.yaml` | Panel of independent models answers one question in parallel — dissent over consensus |
 
 ### Dev Pipeline
 
@@ -252,25 +286,7 @@ Hermetic container with claude-code, codex, gemini, opencode pre-installed. Auto
 
 **New pipelines** — `pipeline.yaml` is not limited to dev workflows. Define any stage graph: CI, deploy, content review, data processing — anything that benefits from signal-driven routing between AI/shell steps.
 
-## CLI
-
-```
-pilot run <pipeline.yaml>              Run the pipeline
-pilot run <pipeline.yaml> --dry-run    Show stages without executing
-pilot run <pipeline.yaml> --verbose    Stream executor output to terminal
-pilot run <pipeline.yaml> --var K=V    Set a pipeline var at launch (repeatable);
-                                       overrides yaml `vars:` defaults
-pilot validate <pipeline.yaml>         Validate config
-pilot init                             List available pipelines
-pilot init <name> [<name>...]          Install selected pipelines into .pilot/
-pilot init --all [--force]             Install everything (--force to overwrite)
-pilot init-skill                       List installed pipelines that have a skill template
-pilot init-skill <name> [--force]      Copy <pipeline>'s SKILL.md template into
-                                       .claude/skills/<name>/ for use in Claude Code
-pilot graph <pipeline.yaml>            Generate PNG visualization of the pipeline
-```
-
-### Skills
+## Skills
 
 A pipeline can declare a `skill: |` field at the top of its `pipeline.yaml`. The string is the verbatim contents of a [Claude Code skill](https://code.claude.com/docs/en/skills) — frontmatter + markdown body. `pilot init-skill <name>` writes that string to `.claude/skills/<name>/SKILL.md`, exposing the pipeline as a `/<name>` slash command in Claude Code.
 
