@@ -194,7 +194,8 @@ def build_volumes(creds_temp: Optional[Path], claude_home: Optional[Path] = None
         add(codex_dir.resolve(), "/mnt/codex", ro=True)
         add_symlink_targets(codex_dir)
 
-    # Gemini config
+    # ~/.gemini — Antigravity (agy) config: oauth token + settings under
+    # antigravity-cli/ (gemini-cli itself is no longer installed; agy succeeds it)
     gemini_dir = home / ".gemini"
     if gemini_dir.is_dir():
         add(gemini_dir.resolve(), "/mnt/gemini", ro=True)

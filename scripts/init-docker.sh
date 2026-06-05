@@ -52,7 +52,9 @@ if [ -f /home/pilot/.claude/settings.json ] && command -v jq >/dev/null 2>&1; th
     done < <(jq -r '.env // {} | to_entries[] | "\(.key)=\(.value)"' /home/pilot/.claude/settings.json 2>/dev/null)
 fi
 
-# Gemini config
+# ~/.gemini config — home of Antigravity (agy): oauth token, settings, and
+# trustedWorkspaces live under ~/.gemini/antigravity-cli/ (gemini-cli itself is
+# no longer installed; agy is its successor).
 if [ -d /mnt/gemini ]; then
     mkdir -p /home/pilot/.gemini
     cp -rL /mnt/gemini/* /home/pilot/.gemini/ 2>/dev/null || true

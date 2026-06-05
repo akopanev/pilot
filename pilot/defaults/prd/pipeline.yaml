@@ -53,8 +53,7 @@ stages:
     prompt: |
       {{file:prompts/research.md}}
     runner:
-      executor: gemini
-      model: gemini-3.1-pro-preview
+      executor: antigravity
     fallback_runner:
       executor: claude-code
       model: opus
@@ -110,8 +109,7 @@ stages:
     prompt: |
       {{file:prompts/review.md}}
     runner:
-      executor: gemini
-      model: gemini-3.1-pro-preview
+      executor: antigravity
     on_signal:
       default: refine_critique
 

@@ -10,10 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN corepack enable
 
 # Install CLI tools
-RUN npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli opencode-ai \
+RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai \
     && command -v claude >/dev/null \
     && command -v codex >/dev/null \
-    && command -v gemini >/dev/null \
     && command -v opencode >/dev/null
 
 # Antigravity CLI (agy) — Google's successor to gemini-cli (consumer gemini-cli EOL 2026-06-18).

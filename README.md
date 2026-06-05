@@ -38,7 +38,7 @@ pilot init --all             # everything
 # Run locally
 pilot run .pilot/dev/pipeline.yaml
 
-# Run in Docker (claude-code, codex, gemini, opencode pre-installed)
+# Run in Docker (claude-code, codex, opencode, antigravity pre-installed)
 pilot-docker run .pilot/dev/pipeline.yaml
 ```
 
@@ -121,8 +121,7 @@ Each stage supports optional `pre_step` and `post_step` — shell commands that 
 | `shell` | Shell scripts/commands (uses `command:`) |
 | `claude-code` | Claude Code (`--dangerously-skip-permissions`) |
 | `codex` | OpenAI Codex (`--dangerously-bypass-approvals-and-sandbox`) |
-| `gemini` | Google Gemini CLI (`--approval-mode yolo`) |
-| `antigravity` | Google Antigravity CLI / `agy` (`--dangerously-skip-permissions`) |
+| `antigravity` | Google Antigravity CLI / `agy` (`--dangerously-skip-permissions`) — successor to gemini-cli |
 | `opencode` | OpenCode (`opencode run -m MODEL PROMPT`) |
 | anything else | Generic CLI (`<tool> --model M -p PROMPT`) |
 
@@ -159,8 +158,7 @@ brainstorm:
       model: gpt-5
       vars:
         OUTPUT: "{{var:OUTPUT_GPT5}}"
-    - executor: gemini
-      model: gemini-2.5-pro
+    - executor: antigravity
       vars:
         OUTPUT: "{{var:OUTPUT_GEMINI}}"
   parallel: true                    # default; set false to serialize
@@ -272,7 +270,7 @@ pilot-docker --build run .pilot/pipeline.yaml    # rebuild image
 ANTHROPIC_API_KEY=sk-... pilot-docker run .pilot/pipeline.yaml
 ```
 
-Hermetic container with claude-code, codex, gemini, opencode pre-installed. Auto-builds image, mounts workspace, forwards credentials (Keychain, API keys, configs), matches host UID.
+Hermetic container with claude-code, codex, opencode, antigravity (agy) pre-installed. Auto-builds image, mounts workspace, forwards credentials (Keychain, API keys, configs), matches host UID.
 
 ## Customization
 
