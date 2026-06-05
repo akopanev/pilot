@@ -116,7 +116,7 @@ stages:
       echo "<signal:var key=ROUND_DIR>$ROUND_DIR</signal:var>"
       echo "<signal:var key=OUTPUT_GLM5>$ROUND_DIR/glm5.md</signal:var>"
       echo "<signal:var key=OUTPUT_GPT5>$ROUND_DIR/gpt5.md</signal:var>"
-      echo "<signal:var key=OUTPUT_GEMINI>$ROUND_DIR/gemini.md</signal:var>"
+      echo "<signal:var key=OUTPUT_AGY>$ROUND_DIR/agy.md</signal:var>"
     prompt: |
       {{file:prompts/spar.md}}
     runners:
@@ -129,8 +129,9 @@ stages:
         vars:
           OUTPUT: "{{var:OUTPUT_GPT5}}"
       - executor: antigravity
+        model: gemini-3.1-pro-high
         vars:
-          OUTPUT: "{{var:OUTPUT_GEMINI}}"
+          OUTPUT: "{{var:OUTPUT_AGY}}"
     parallel: true
     min_success: 1
     per_runner_timeout: 1800
