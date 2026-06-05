@@ -117,6 +117,7 @@ stages:
       echo "<signal:var key=OUTPUT_GLM5>$ROUND_DIR/glm5.md</signal:var>"
       echo "<signal:var key=OUTPUT_GPT5>$ROUND_DIR/gpt5.md</signal:var>"
       echo "<signal:var key=OUTPUT_SONNET>$ROUND_DIR/sonnet.md</signal:var>"
+      echo "<signal:var key=OUTPUT_AGY>$ROUND_DIR/agy.md</signal:var>"
     prompt: |
       {{file:prompts/spar.md}}
     runners:
@@ -132,6 +133,10 @@ stages:
         model: sonnet
         vars:
           OUTPUT: "{{var:OUTPUT_SONNET}}"
+      - executor: antigravity
+        model: gemini-3.1-pro-high
+        vars:
+          OUTPUT: "{{var:OUTPUT_AGY}}"
     parallel: true
     min_success: 1
     per_runner_timeout: 1800

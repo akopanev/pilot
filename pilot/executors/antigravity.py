@@ -95,7 +95,14 @@ class AntigravityExecutor:
         # Fail fast instead of hanging: agy --dangerously-skip-permissions blocks
         # forever in an untrusted workspace. TODO: optionally auto-add cwd to
         # trustedWorkspaces (decided against for now — don't mutate user config).
-        if not _is_trusted(cwd):
+        #
+        # In Docker the container IS the sandbox: agy's trustedWorkspaces is
+        # unreliable there (ends up empty regardless of init-docker), yet agy runs
+        # in /workspace with --dangerously-skip-permissions and --print-timeout
+        # bounds any hang — so skip this host-only guard. (Headless OAuth may still
+        # fail for keychain-bound tokens; see antigravity-cli #57/#78.)
+        in_docker = os.environ.get("PILOT_DOCKER") == "1"
+        if not in_docker and not _is_trusted(cwd):
             raise RuntimeError(
                 f"antigravity: workspace '{cwd}' is not trusted by agy, so "
                 f"`agy --dangerously-skip-permissions` would hang. Trust it once "
