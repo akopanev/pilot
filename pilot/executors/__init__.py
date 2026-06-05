@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pilot.executors.antigravity import AntigravityExecutor
 from pilot.executors.claude import ClaudeExecutor
 from pilot.executors.codex import CodexExecutor
 from pilot.executors.gemini import GeminiExecutor
@@ -19,6 +20,7 @@ class ExecutorPool:
       - "claude-code" -> ClaudeExecutor   (JSON stream)
       - "codex"       -> CodexExecutor    (split stderr/stdout)
       - "gemini"      -> GeminiExecutor   (JSON stream, yolo mode)
+      - "antigravity" -> AntigravityExecutor (agy CLI, plain-text --print mode)
       - "opencode"    -> OpenCodeExecutor (opencode.ai, dangerous mode)
       - anything else -> GenericExecutor  (plain text)
     """
@@ -41,6 +43,8 @@ class ExecutorPool:
             return CodexExecutor()
         if name == "gemini":
             return GeminiExecutor()
+        if name == "antigravity":
+            return AntigravityExecutor()
         if name == "opencode":
             return OpenCodeExecutor()
         return GenericExecutor(tool=name)

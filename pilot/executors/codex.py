@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import threading
 
@@ -62,21 +61,31 @@ class CodexExecutor:
             known_signals: set[str] | None = None,
             on_output: callable = None,
             on_signal: callable = None,
-            cancel=None) -> ExecutorResult:
-        effective_model = model or "o3"
-        use_docker = os.environ.get("PILOT_DOCKER") == "1"
+            cancel=None,
+            args: list[str] | None = None) -> ExecutorResult:
+        # None → codex наследует model из ~/.codex/config.toml (обычно gpt-5.5).
+        # НЕ навязываем "o3": она недоступна для ChatGPT-subscription аккаунта → сервер 400 → exit 1.
+        effective_model = model
 
-        cmd = ["codex", "exec", "--json"]
-        if use_docker:
-            cmd.append("--dangerously-bypass-approvals-and-sandbox")
-        else:
-            cmd.append("--full-auto")
+        # Полный yolo одинаково на host и в docker. Раньше host шёл через --full-auto,
+        # а это (а) deprecated в codex >=0.136 ("use --sandbox workspace-write instead"),
+        # (б) = --sandbox workspace-write, т.е. codex на host сидел В ПЕСОЧНИЦЕ (нет сети,
+        # нет записи вне cwd) — расходясь с docker-веткой (--dangerously-bypass...), где
+        # codex развязан. Отсюда "работает только в докере". Единый bypass: без песочницы,
+        # без аппрувов — как claude --dangerously-skip-permissions в этом же пуле.
+        cmd = ["codex", "exec", "--json",
+               "--dangerously-bypass-approvals-and-sandbox",
+               "--skip-git-repo-check"]
+        if effective_model:
+            cmd += ["-c", f'model="{effective_model}"']
         cmd += [
-            "--skip-git-repo-check",
-            "-c", f'model="{effective_model}"',
             "-c", "model_reasoning_effort=xhigh",
             "-c", "stream_idle_timeout_ms=3600000",
         ]
+        # Raw per-runner args last → автор может переопределить дефолты выше
+        # (codex слоит -c по принципу "последний выигрывает").
+        if args:
+            cmd += args
 
         proc = subprocess.Popen(
             cmd,
@@ -127,6 +136,17 @@ class CodexExecutor:
                         all_signals.append(sig)
                         if on_signal:
                             on_signal(sig)
+                    continue
+
+                # Error / turn.failed — поймать РЕАЛЬНУЮ причину (иначе теряется → "0 вывода, exit 1")
+                etype = event.get("type", "")
+                if etype in ("error", "turn.failed") or event.get("error"):
+                    detail = event.get("message") or event.get("error") or event
+                    if isinstance(detail, (dict, list)):
+                        detail = json.dumps(detail, ensure_ascii=False)
+                    stdout_error = f"codex {etype or 'error'}: {detail}"
+                    if on_output:
+                        on_output(stdout_error)
                     continue
 
                 # Other events — show progress
