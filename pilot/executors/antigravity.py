@@ -1,18 +1,28 @@
 """Antigravity CLI executor — plain-text streaming from the `agy` CLI.
 
-Antigravity CLI (binary: `agy`, v1.0.0) is Google's successor to Gemini CLI
+Antigravity CLI (binary: `agy`, v1.0.4) is Google's successor to Gemini CLI
 (consumer Gemini CLI stops serving 2026-06-18). Its headless interface follows
 Claude Code conventions, NOT Gemini's:
 
-  - prompt is a positional arg after `--print` (`--print`/`-p`/`--prompt` are a
-    boolean mode flag, not a value holder).
+  - `--print` TAKES A VALUE (the prompt). It is NOT a boolean mode flag: the
+    token right after `--print` is consumed as the prompt. Therefore `--print`
+    must be the LAST flag and the prompt its value — e.g.
+    `agy <flags> --print "<prompt>"`. The earlier layout
+    `agy --print --dangerously-skip-permissions ... <prompt>` silently fed
+    `--dangerously-skip-permissions` to `--print` as the prompt, so the skip
+    flag never took effect (no tool perms → agy wrote no OUTPUT file and
+    emitted nothing useful). Verified on v1.0.4.
   - `--dangerously-skip-permissions` auto-approves tools (required for our
-    file-editing pipelines), replacing gemini's `--approval-mode yolo`.
+    file-editing pipelines — agy writes the OUTPUT file via its own file tool),
+    replacing gemini's `--approval-mode yolo`.
   - output is PLAIN TEXT on stdout — there is no `--output-format`/JSON mode.
-  - there is NO per-invocation model flag (`-m`/`--model` are rejected, env is
-    ignored). The model is a global setting in
-    `~/.gemini/antigravity-cli/settings.json` ("model" key; default
-    gemini-3.5-flash). `runner.model` is therefore ignored here.
+  - per-invocation model IS supported as of v1.0.4: `--model "<name>"` where
+    <name> is one of `agy models` (e.g. "Gemini 3.1 Pro (High)",
+    "Claude Opus 4.6 (Thinking)", "GPT-OSS 120B (Medium)"). Reasoning effort is
+    encoded in the name suffix — (Low)/(Medium)/(High)/(Thinking). `runner.model`
+    is passed through verbatim to `--model`; if omitted, agy uses the global
+    "model" in `~/.gemini/antigravity-cli/settings.json`. A short-slug alias map
+    (see _MODEL_ALIASES) lets pipelines use `gemini-3.1-pro-high` style ids too.
   - workspace trust is NOT a flag: the cwd must be in `trustedWorkspaces` in the
     global settings.json, otherwise `agy --dangerously-skip-permissions` HANGS
     waiting for interactive trust. We pre-flight that and fail fast instead.
@@ -35,6 +45,21 @@ _SETTINGS_PATH = os.path.expanduser("~/.gemini/antigravity-cli/settings.json")
 
 # Generous cap for long agent runs (Go duration string). agy's default is 5m.
 _PRINT_TIMEOUT = "60m"
+
+# Convenience slugs → exact `agy models` names. Pipelines may set runner.model to
+# either a slug here or the full agy name (passed through verbatim if not found).
+# Run `agy models` to see the live list; effort is the (…) suffix.
+_MODEL_ALIASES = {
+    "gemini-3.5-flash": "Gemini 3.5 Flash (Medium)",
+    "gemini-3.5-flash-low": "Gemini 3.5 Flash (Low)",
+    "gemini-3.5-flash-high": "Gemini 3.5 Flash (High)",
+    "gemini-3.1-pro": "Gemini 3.1 Pro (High)",
+    "gemini-3.1-pro-low": "Gemini 3.1 Pro (Low)",
+    "gemini-3.1-pro-high": "Gemini 3.1 Pro (High)",
+    "claude-sonnet-4.6": "Claude Sonnet 4.6 (Thinking)",
+    "claude-opus-4.6": "Claude Opus 4.6 (Thinking)",
+    "gpt-oss-120b": "GPT-OSS 120B (Medium)",
+}
 
 
 def _trusted_roots() -> list[str]:
@@ -60,10 +85,6 @@ def _is_trusted(cwd: str) -> bool:
 class AntigravityExecutor:
     """Runs the `agy` CLI in headless (--print) mode with plain-text output."""
 
-    def __init__(self):
-        # Warn at most once per process about the ignored model selection.
-        self._model_warned = False
-
     def run(self, prompt: str, model: str | None = None,
             known_signals: set[str] | None = None,
             on_output: callable = None,
@@ -82,23 +103,21 @@ class AntigravityExecutor:
                 f"\"trustedWorkspaces\" in {_SETTINGS_PATH})."
             )
 
-        # agy ignores per-invocation model selection; surface it once.
-        if model and on_output and not self._model_warned:
-            on_output(
-                f"[antigravity] note: agy does not support per-run model "
-                f"selection; '{model}' ignored. Set \"model\" in {_SETTINGS_PATH}."
-            )
-            self._model_warned = True
-
+        # Flags first; `--print <prompt>` LAST because `--print` consumes the
+        # next token as the prompt value (see module docstring). Putting any flag
+        # after `--print` would make that flag the prompt.
         cmd = [
-            "agy", "--print",
+            "agy",
             "--dangerously-skip-permissions",
             "--print-timeout", _PRINT_TIMEOUT,
         ]
-        # Raw per-runner args before the positional prompt (which must be last).
+        # Per-invocation model (v1.0.4+): map a known slug or pass through verbatim.
+        if model:
+            cmd += ["--model", _MODEL_ALIASES.get(model, model)]
+        # Raw per-runner args, still before `--print`.
         if args:
             cmd += args
-        cmd.append(prompt)  # positional, must come after all flags
+        cmd += ["--print", prompt]  # MUST be last: prompt is the value of --print
 
         proc = subprocess.Popen(
             cmd,
