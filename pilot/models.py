@@ -17,6 +17,14 @@ class Runner:
     ensemble stages to give each runner its own OUTPUT path, ROLE, etc.,
     without polluting global vars."""
 
+    args: list[str] = field(default_factory=list)
+    """Extra CLI args appended verbatim to the executor invocation, after the
+    executor's own default flags so the author can override them (codex layers
+    `-c` last-wins; for prompt-in-argv executors they sit just before the
+    prompt). Author-owned escape hatch for per-tool tuning pilot doesn't model
+    — e.g. `["-c", "model_reasoning_effort=high"]` for codex,
+    `["--effort", "high"]` for claude. Ignored by the shell executor."""
+
 
 @dataclass
 class Transition:

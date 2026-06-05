@@ -27,7 +27,8 @@ class GeminiExecutor:
             known_signals: set[str] | None = None,
             on_output: callable = None,
             on_signal: callable = None,
-            cancel: threading.Event | None = None) -> ExecutorResult:
+            cancel: threading.Event | None = None,
+            args: list[str] | None = None) -> ExecutorResult:
         cmd = [
             "gemini", "--approval-mode", "yolo",
             # Required for headless/automated runs in untrusted folders
@@ -39,6 +40,9 @@ class GeminiExecutor:
         ]
         if model:
             cmd.extend(["-m", model])
+        # Raw per-runner args before the prompt so -p doesn't swallow them.
+        if args:
+            cmd += args
         cmd.extend(["-p", prompt])
 
         proc = subprocess.Popen(

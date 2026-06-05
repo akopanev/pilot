@@ -53,13 +53,17 @@ class ClaudeExecutor:
             known_signals: set[str] | None = None,
             on_output: callable = None,
             on_signal: callable = None,
-            cancel: threading.Event | None = None) -> ExecutorResult:
+            cancel: threading.Event | None = None,
+            args: list[str] | None = None) -> ExecutorResult:
         cmd = [
             "claude", "--dangerously-skip-permissions",
             "--output-format", "stream-json", "--verbose",
         ]
         if model:
             cmd.extend(["--model", model])
+        # Raw per-runner args before the prompt so -p doesn't swallow them.
+        if args:
+            cmd += args
         cmd.extend(["-p", prompt])
 
         env = _filter_env("ANTHROPIC_API_KEY")

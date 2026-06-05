@@ -21,10 +21,14 @@ class GenericExecutor:
             known_signals: set[str] | None = None,
             on_output: callable = None,
             on_signal: callable = None,
-            cancel=None) -> ExecutorResult:
+            cancel=None,
+            args: list[str] | None = None) -> ExecutorResult:
         cmd = [self.tool]
         if model:
             cmd.extend(["--model", model])
+        # Raw per-runner args before the prompt so -p doesn't swallow them.
+        if args:
+            cmd += args
         cmd.extend(["-p", prompt])
 
         proc = subprocess.Popen(

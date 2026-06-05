@@ -18,10 +18,14 @@ class OpenCodeExecutor:
             known_signals: set[str] | None = None,
             on_output: callable = None,
             on_signal: callable = None,
-            cancel=None) -> ExecutorResult:
+            cancel=None,
+            args: list[str] | None = None) -> ExecutorResult:
         cmd = ["opencode", "run"]
         if model:
             cmd.extend(["-m", model])
+        # Raw per-runner args before the positional prompt.
+        if args:
+            cmd += args
         cmd.append(prompt)
 
         proc = subprocess.Popen(

@@ -29,7 +29,23 @@ def _parse_runner(data: dict, label: str) -> Runner:
         raise ConfigError(f"{label}: 'vars' must be a mapping")
     runner_vars = {str(k): str(v) for k, v in vars_raw.items()}
 
-    return Runner(executor=executor, model=model, command=command, vars=runner_vars)
+    args_raw = data.get("args", [])
+    if not isinstance(args_raw, list):
+        raise ConfigError(f"{label}: 'args' must be a list of CLI tokens")
+    for a in args_raw:
+        if isinstance(a, (dict, list)):
+            raise ConfigError(
+                f"{label}: 'args' must be a list of scalars, got {type(a).__name__}"
+            )
+    runner_args = [str(a) for a in args_raw]
+    if runner_args and executor == "shell":
+        raise ConfigError(
+            f"{label}: 'args' is not supported for the shell executor "
+            f"(put flags inside 'command')"
+        )
+
+    return Runner(executor=executor, model=model, command=command,
+                  vars=runner_vars, args=runner_args)
 
 
 def _parse_transition(data, signal_name: str, stage_name: str) -> Transition:

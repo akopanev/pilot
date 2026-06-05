@@ -19,7 +19,10 @@ class ShellExecutor:
             known_signals: set[str] | None = None,
             on_output: callable = None,
             on_signal: callable = None,
-            cancel=None) -> ExecutorResult:
+            cancel=None,
+            args: list[str] | None = None) -> ExecutorResult:
+        # `args` accepted for a uniform executor signature; shell stages carry
+        # their flags inside `command`, so it is intentionally unused here.
         env = {
             **os.environ,
             # Force non-interactive for all tools

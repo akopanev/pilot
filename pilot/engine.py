@@ -365,6 +365,7 @@ class PipelineEngine:
                     prompt, model=runner.model, known_signals=known,
                     on_output=on_output,
                     on_signal=on_signal,
+                    args=runner.args,
                 )
                 if result.exit_code == 0:
                     return result
@@ -452,6 +453,7 @@ class PipelineEngine:
                         worker_prompt, model=runner.model, known_signals=known,
                         on_output=on_output, on_signal=on_signal,
                         cancel=cancel,
+                        args=runner.args,
                     )
                     if run_result.exit_code == 0:
                         break
