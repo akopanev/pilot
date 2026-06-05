@@ -59,6 +59,22 @@ if [ -d /mnt/gemini ]; then
     chown -R pilot:pilot /home/pilot/.gemini
 fi
 
+# Antigravity (agy): trust the container workspace. The host's trustedWorkspaces
+# (copied above under .gemini/antigravity-cli/) point at host paths, but the
+# container cwd is /workspace — without it `agy --dangerously-skip-permissions`
+# HANGS on the interactive trust prompt. Add /workspace (create settings if absent).
+AGY_SETTINGS=/home/pilot/.gemini/antigravity-cli/settings.json
+if command -v jq >/dev/null 2>&1; then
+    mkdir -p /home/pilot/.gemini/antigravity-cli
+    if [ -f "$AGY_SETTINGS" ]; then
+        jq '.trustedWorkspaces = ((.trustedWorkspaces // []) + ["/workspace"] | unique)' \
+            "$AGY_SETTINGS" > "${AGY_SETTINGS}.tmp" && mv "${AGY_SETTINGS}.tmp" "$AGY_SETTINGS"
+    else
+        echo '{"trustedWorkspaces":["/workspace"]}' > "$AGY_SETTINGS"
+    fi
+    chown -R pilot:pilot /home/pilot/.gemini
+fi
+
 # Codex credentials
 if [ -d /mnt/codex ]; then
     mkdir -p /home/pilot/.codex

@@ -13,7 +13,15 @@ RUN corepack enable
 RUN npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli opencode-ai \
     && command -v claude >/dev/null \
     && command -v codex >/dev/null \
-    && command -v gemini >/dev/null
+    && command -v gemini >/dev/null \
+    && command -v opencode >/dev/null
+
+# Antigravity CLI (agy) — Google's successor to gemini-cli (consumer gemini-cli EOL 2026-06-18).
+# Official installer; --dir drops the binary straight onto the system PATH so the runtime
+# `pilot` user finds it. Workspace trust for /workspace is configured in init-docker.sh.
+RUN curl -fsSL https://antigravity.google/cli/install.sh | bash -s -- --dir /usr/local/bin \
+    && command -v agy >/dev/null \
+    && agy --version
 
 # Install ticket (tk) — git-backed issue tracker (full clone for plugins)
 RUN git clone --depth 1 https://github.com/wedow/ticket.git /opt/ticket \
